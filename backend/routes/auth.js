@@ -1,8 +1,11 @@
 const express = require('express');
-const router = express.Router(); // Usamos el Router de Express
-const bcrypt = require('bcryptjs'); // Para encriptar contraseñas
-const jwt = require('jsonwebtoken'); // Para generar tokens web
-const { Pool } = require('pg'); // Cliente de PostgreSQL para la base de datos
+const router = express.Router();
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { Pool } = require('pg');
+
+const { protect } = require('../middleware/authMiddleware');
+const passport = require('passport'); // Esta es la línea que añadimos para Passport
 
 // Configuración de la base de datos (usando las variables de entorno de .env)
 const pool = new Pool({
@@ -13,8 +16,8 @@ const pool = new Pool({
     port: process.env.DB_PORT,
 });
 
-// Clave secreta para firmar los tokens JWT (¡DEBE SER FUERTE Y GUARDARSE EN .env!)
-const jwtSecret = process.env.JWT_SECRET || 'supersecretkey'; // Usar variable de entorno para producción
+// Clave secreta para firmar los tokens JWT
+const jwtSecret = process.env.JWT_SECRET || 'supersecretkey';
 
 // --- Ruta de Registro de Usuario ---
 router.post('/register', async (req, res) => {
@@ -25,17 +28,14 @@ router.post('/register', async (req, res) => {
     }
 
     try {
-        // 1. Verificar si el usuario ya existe
         const existingUser = await pool.query('SELECT * FROM clientes WHERE email = $1', [email]);
         if (existingUser.rows.length > 0) {
             return res.status(400).json({ error: 'El email ya está registrado.' });
         }
 
-        // 2. Encriptar la contraseña
-        const salt = await bcrypt.genSalt(10); // Generar un "salt" (cadena aleatoria para la encriptación)
-        const passwordHash = await bcrypt.hash(password, salt); // Encriptar la contraseña con el salt
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(password, salt);
 
-        // 3. Guardar el nuevo cliente en la base de datos
         const newUser = await pool.query(
             'INSERT INTO clientes (nombre, email, password_hash, telefono) VALUES ($1, $2, $3, $4) RETURNING id, nombre, email, puntos_actuales',
             [nombre, email, passwordHash, telefono]
@@ -43,22 +43,20 @@ router.post('/register', async (req, res) => {
 
         const cliente = newUser.rows[0];
 
-        // 4. Inicializar preferencias de notificación para el nuevo cliente
         await pool.query(
             'INSERT INTO preferencias_notificaciones (cliente_id, recibir_notificaciones, recibir_ofertas_especiales, recibir_recordatorios_puntos) VALUES ($1, $2, $3, $4)',
-            [cliente.id, true, true, true] // Por defecto, todas activadas
+            [cliente.id, true, true, true]
         );
 
-        // 5. Generar un Token JWT
         const token = jwt.sign(
-            { id: cliente.id, email: cliente.email }, // Payload del token
-            jwtSecret, // Clave secreta
-            { expiresIn: '1h' } // El token expira en 1 hora
+            { id: cliente.id, email: cliente.email },
+            jwtSecret,
+            { expiresIn: '1h' }
         );
 
         res.status(201).json({
             message: 'Usuario registrado exitosamente',
-            token, // Enviamos el token al cliente
+            token,
             cliente: {
                 id: cliente.id,
                 nombre: cliente.nombre,
@@ -82,16 +80,13 @@ router.post('/login', async (req, res) => {
     }
 
     try {
-        // 1. Buscar al cliente por email
         const user = await pool.query('SELECT * FROM clientes WHERE email = $1', [email]);
         if (user.rows.length === 0) {
-            return res.status(400).json({ error: 'Credenciales inválidas.' }); // Mensaje genérico por seguridad
+            return res.status(400).json({ error: 'Credenciales inválidas.' });
         }
 
         const cliente = user.rows[0];
 
-        // 2. Comparar la contraseña ingresada con el hash guardado
-        // Si el cliente no tiene password_hash (ej. se registró con Google/Facebook), no podemos validar
         if (!cliente.password_hash) {
             return res.status(400).json({ error: 'Este usuario se registró con autenticación externa. Por favor, inicia sesión con ese método.' });
         }
@@ -101,7 +96,6 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ error: 'Credenciales inválidas.' });
         }
 
-        // 3. Generar un Token JWT
         const token = jwt.sign(
             { id: cliente.id, email: cliente.email },
             jwtSecret,
@@ -124,5 +118,43 @@ router.post('/login', async (req, res) => {
         res.status(500).json({ error: 'Error interno del servidor al iniciar sesión.' });
     }
 });
+
+// --- Ruta Protegida: Obtener Perfil del Usuario Autenticado ---
+router.get('/me', protect, async (req, res) => {
+    res.status(200).json({
+        id: req.user.id,
+        nombre: req.user.nombre,
+        email: req.user.email,
+        puntos_actuales: req.user.puntos_actuales,
+    });
+});
+
+
+// --- Rutas de Autenticación con Google ---
+
+// 1. Ruta para iniciar la autenticación de Google
+router.get('/google',
+    passport.authenticate('google', { scope: ['profile', 'email'] })
+);
+
+// 2. Ruta de callback de Google
+router.get('/google/callback',
+    passport.authenticate('google', { failureRedirect: '/login-failure' }),
+    (req, res) => {
+        const token = jwt.sign(
+            { id: req.user.id, email: req.user.email },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h' }
+        );
+
+        res.redirect(`http://localhost:3000/auth-success?token=${token}`);
+    }
+);
+
+// Ruta de fallo de autenticación
+router.get('/login-failure', (req, res) => {
+    res.status(401).send('Error de autenticación con Google.');
+});
+
 
 module.exports = router; // Exportamos el router para usarlo en server.js

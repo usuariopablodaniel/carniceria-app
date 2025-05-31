@@ -3,6 +3,10 @@ const authRoutes = require('./routes/auth'); // Importa las rutas de autenticaci
 const express = require('express');
 const { Pool } = require('pg'); // Cliente de PostgreSQL
 const cors = require('cors'); // Para permitir que tu frontend (React) se comunique con el backend
+const passport = require('passport'); // << AÑADE ESTA LÍNEA
+const session = require('express-session'); // << AÑADE ESTA LÍNEA (la instalaremos después)
+
+require('./config/passport');
 
 const app = express();
 const port = process.env.PORT || 5000; // Puerto donde correrá tu backend
@@ -20,8 +24,24 @@ const pool = new Pool({
 // Middleware: Son funciones que se ejecutan antes de que lleguen a tus rutas
 app.use(cors()); // Permite solicitudes desde tu frontend React (dominio diferente)
 app.use(express.json()); // Habilita Express para parsear (leer) el cuerpo de las solicitudes en formato JSON
+// Configuración de Sesiones para Passport
+app.use(session({
+    secret: process.env.SESSION_SECRET, // Usa el secreto de tu .env
+    resave: false, // No guardar la sesión si no ha cambiado
+    saveUninitialized: false, // No crear sesión para usuarios no inicializados
+    cookie: { secure: false } // Para desarrollo (HTTP) usar 'false'. En producción (HTTPS) debe ser 'true'.
+}));
 
-app.use('/api/auth', authRoutes); // Usa las rutas de autenticación con el prefijo /api/auth
+
+
+// Inicializar Passport y Restaurar Sesión (¡AÑADE ESTO!)
+app.use(passport.initialize());
+app.use(passport.session());
+
+app.use('/api/auth', authRoutes); // Tus rutas de autenticación
+
+// ... el resto de tus rutas de prueba ...
+
 
 // --- Rutas de Prueba para Verificar el Backend ---
 
