@@ -1,0 +1,60 @@
+-- Este script creará las tablas necesarias para la aplicación Carniceria App
+
+-- Tabla para Clientes
+CREATE TABLE IF NOT EXISTS clientes (
+    id SERIAL PRIMARY KEY,
+    nombre VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255), -- Será NULL para usuarios registrados con Google
+    google_id VARCHAR(255) UNIQUE, -- ID único de Google para autenticación externa
+    telefono VARCHAR(50),
+    puntos_actuales INT DEFAULT 0,
+    es_admin BOOLEAN DEFAULT FALSE, -- Campo para identificar administradores
+    fecha_registro TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    fecha_ultima_sesion TIMESTAMP WITH TIME ZONE
+);
+
+-- Tabla para Preferencias de Notificaciones (asociada a clientes)
+CREATE TABLE IF NOT EXISTS preferencias_notificaciones (
+    id SERIAL PRIMARY KEY,
+    cliente_id INT UNIQUE NOT NULL,
+    recibir_notificaciones BOOLEAN DEFAULT TRUE,
+    recibir_ofertas_especiales BOOLEAN DEFAULT TRUE,
+    recibir_recordatorios_puntos BOOLEAN DEFAULT TRUE,
+    FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
+);
+
+-- Tabla para Productos (LA NUEVA TABLA)
+CREATE TABLE IF NOT EXISTS productos (
+    id SERIAL PRIMARY KEY,
+    nombre VARCHAR(255) NOT NULL,
+    descripcion TEXT,
+    precio DECIMAL(10, 2) NOT NULL,
+    stock INT NOT NULL DEFAULT 0,
+    unidad_de_medida VARCHAR(50), -- Ejemplo: 'kg', 'unidad', 'paquete'
+    imagen_url VARCHAR(255), -- Para la URL de una imagen del producto
+    categoria VARCHAR(100), -- Ejemplo: 'Res', 'Cerdo', 'Aves', 'Embutidos'
+    disponible BOOLEAN DEFAULT TRUE, -- Si el producto está activo para la venta
+    fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Opcional: Función y Trigger para actualizar fecha_actualizacion de productos
+-- Esto actualizará automáticamente 'fecha_actualizacion' cada vez que se modifique un producto
+CREATE OR REPLACE FUNCTION update_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.fecha_actualizacion = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Aplicar el trigger a la tabla productos
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_productos_timestamp') THEN
+        CREATE TRIGGER update_productos_timestamp
+        BEFORE UPDATE ON productos
+        FOR EACH ROW
+        EXECUTE FUNCTION update_timestamp();
+    END IF;
+END $$;
