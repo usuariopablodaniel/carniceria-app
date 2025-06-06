@@ -14,6 +14,7 @@ import HomePage from './pages/HomePage'; // Para la ruta principal '/'
 import LoginPage from './pages/LoginPage'; // Para la ruta de login '/login'
 import DashboardPage from './pages/DashboardPage'; // Para la ruta '/dashboard' (donde redirigiremos después del login de Google)
 import ProductAddPage from './pages/ProductAddPage';
+import RegisterPage from './pages/RegisterPage';
 // *** NUEVA IMPORTACIÓN: El componente para manejar el éxito de Google ***
 import AuthSuccessHandler from './components/AuthSuccessHandler';
 
@@ -34,6 +35,9 @@ function App() {
 
           {/* Ruta para el Dashboard (donde el usuario va después de iniciar sesión) */}
           <Route path="/dashboard" element={<DashboardPage />} />
+
+           {/* *** RUTA PARA LA PÁGINA DE REGISTRO *** */}
+          <Route path="/register" element={<RegisterPage />} />
 
           {/* *** LA RUTA CRÍTICA PARA MANEJAR EL TOKEN DE GOOGLE *** */}
           <Route path="/auth-success" element={<AuthSuccessHandler />} />
