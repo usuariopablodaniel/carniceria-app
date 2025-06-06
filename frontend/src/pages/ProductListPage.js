@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Container, Row, Col, Card, Spinner, Alert, Button } from 'react-bootstrap';
 
 const ProductListPage = () => {
   const [products, setProducts] = useState([]);
@@ -10,7 +11,7 @@ const ProductListPage = () => {
       try {
         const response = await fetch('http://localhost:5000/api/products');
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          throw new Error(`Error en la red o servidor: ${response.status} ${response.statusText}`);
         }
         const data = await response.json();
         setProducts(data);
@@ -25,82 +26,103 @@ const ProductListPage = () => {
     fetchProducts();
   }, []);
 
-  // Estilos para el contenedor de la cuadrícula, común para cargando y para datos
-  const gridContainerStyle = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
-    gap: '20px',
-    minHeight: '500px', // Mantén esta altura mínima para el contenedor principal
-    textAlign: 'center' // Para centrar el texto "Cargando productos..."
-  };
-
   if (error) {
-    return <p style={{ color: 'red', padding: '20px' }}>{error}</p>; // Añadimos padding para que no se vea pegado
+    return (
+      <Container className="my-4">
+        <Alert variant="danger" className="text-center">
+          {error}
+        </Alert>
+      </Container>
+    );
   }
 
   return (
-    <div style={{ padding: '20px' }}> {/* Agregamos un padding general a la página */}
-      <h1>Nuestros Productos</h1>
+    <Container className="my-4">
+      <h1 className="text-center mb-4">Nuestros Productos</h1>
+
+      {/* Aquí podrías añadir una barra de búsqueda o filtros, si los descomentas: */}
+      {/*
+      <Row className="mb-4">
+        <Col>
+          <InputGroup>
+            <FormControl
+              placeholder="Buscar productos..."
+              aria-label="Buscar productos"
+            />
+            <Button variant="outline-secondary">Buscar</Button>
+          </InputGroup>
+        </Col>
+        <Col xs="auto">
+          <Button variant="success">Añadir Producto</Button>
+        </Col>
+      </Row>
+      */}
+
       {loading ? (
-        // Muestra un esqueleto de 4 tarjetas mientras carga
-        <div style={{
-          ...gridContainerStyle, // Hereda las propiedades del grid
-          // Alinear y centrar el mensaje de carga dentro del contenedor del esqueleto
-          alignItems: 'center',
-          justifyContent: 'center',
-          paddingTop: '20px' // Espacio para que el mensaje no esté pegado al título
-        }}>
-          <p style={{ gridColumn: '1 / -1', textAlign: 'center' }}>Cargando productos...</p> {/* Centrar el mensaje en todo el ancho del grid */}
-          {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} style={{
-              border: '1px dashed #eee', // Un borde tenue para el esqueleto
-              borderRadius: '8px',
-              padding: '15px',
-              minHeight: '200px', // Altura de una tarjeta de esqueleto
-              backgroundColor: '#f5f5f5',
-              animation: 'pulse 1.5s infinite ease-in-out' // Opcional: animación de carga
-            }}>
-              {/* Puedes poner líneas grises que simulen texto si quieres un esqueleto más elaborado */}
-            </div>
-          ))}
+        <div className="d-flex flex-column align-items-center justify-content-center" style={{ minHeight: '500px' }}>
+          <Spinner animation="border" role="status" className="mb-3">
+            <span className="visually-hidden">Cargando productos...</span>
+          </Spinner>
+          <p>Cargando productos...</p>
+          <Row className="mt-4 w-100 justify-content-center">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Col key={index} xs={12} sm={6} md={4} lg={3} className="mb-4">
+                <Card style={{ minHeight: '250px' }}>
+                  <Card.Body className="d-flex flex-column justify-content-center">
+                    <div className="placeholder-glow text-center">
+                      <span className="placeholder col-8 mb-2" style={{ height: '100px', display: 'block' }}></span>
+                      <span className="placeholder col-7 mb-2"></span>
+                      <span className="placeholder col-4 mb-2"></span>
+                      <span className="placeholder col-6"></span>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+            ))}
+          </Row>
         </div>
       ) : products.length === 0 ? (
-        <p style={{ padding: '20px' }}>No hay productos disponibles en este momento.</p> // Añadimos padding
+        <Alert variant="info" className="text-center my-4">
+          No hay productos disponibles en este momento.
+          {/* Opcional: un botón para agregar un producto si la página está vacía */}
+          {/* <Button variant="primary" className="ms-2">Añadir el primer producto</Button> */}
+        </Alert>
       ) : (
-        // Si hay productos, los muestra en la cuadrícula
-        <div style={gridContainerStyle}> {/* Usamos el estilo común aquí */}
+        <Row className="justify-content-center">
           {products.map(product => (
-            <div key={product.id} style={{
-                border: '1px solid #ccc',
-                borderRadius: '8px',
-                padding: '15px',
-                textAlign: 'center',
-                fontFamily: 'Arial, sans-serif', // Forzar una fuente del sistema
-                fontSize: '16px', // Forzar un tamaño de fuente base
-                lineHeight: '1.4', // Forzar una altura de línea
-                display: 'flex', // Añadimos flexbox para mejor control interno
-                flexDirection: 'column',
-                justifyContent: 'space-between', // Para distribuir el contenido
-                height: '100%' // Asegurar que la tarjeta ocupa toda la altura disponible en el grid
-            }}>
-              {product.imagen_url && (
-                <img
-                  src={product.imagen_url}
-                  alt={product.nombre}
-                  style={{ maxWidth: '100%', height: '150px', objectFit: 'cover', borderRadius: '4px', marginBottom: '10px' }}
-                  onError={(e) => { e.target.onerror = null; e.target.src = 'https://via.placeholder.com/150?text=No+Image'; }}
-                />
-              )}
-              <h2 style={{ fontSize: '20px', lineHeight: '1.2', margin: '0 0 10px 0' }}>{product.nombre}</h2>
-              <p style={{ fontSize: '14px', lineHeight: '1.5', margin: '0 0 5px 0' }}>{product.descripcion}</p>
-              <p style={{ fontSize: '14px', lineHeight: '1.5', margin: '0 0 5px 0' }}>Precio: ${parseFloat(product.precio).toFixed(2)} / {product.unidad_de_medida}</p>
-              <p style={{ fontSize: '14px', lineHeight: '1.5', margin: '0 0 5px 0' }}>Stock: {product.stock}</p>
-              <p style={{ fontSize: '14px', lineHeight: '1.5', margin: '0 0 0 0' }}>Categoría: {product.categoria}</p>
-            </div>
+            <Col key={product.id} xs={12} sm={6} md={4} lg={3} className="mb-4">
+              <Card className="h-100 shadow-sm">
+                {product.imagen_url && (
+                  <Card.Img
+                    variant="top"
+                    src={product.imagen_url || 'https://via.placeholder.com/180x180?text=Imagen+No+Disponible' }
+                    alt={product.nombre}
+                    style={{ height: '180px', objectFit: 'cover' }}
+                    onError={(e) => { e.target.onerror = null; e.target.src = 'https://via.placeholder.com/180x180?text=No+Image'; }}
+                  />
+                )}
+                <Card.Body className="d-flex flex-column">
+                  <Card.Title className="text-truncate mb-2">{product.nombre}</Card.Title>
+                  
+                  <Card.Text className="text-muted small mb-1 product-description">
+                    {product.descripcion}
+                  </Card.Text>
+                  
+                  <Card.Text className="mt-auto">
+                    <strong>Precio: ${parseFloat(product.precio).toFixed(2)}</strong> / {product.unidad_de_medida}<br/>
+                    Stock: {product.stock}<br/>
+                    Categoría: <span className="badge bg-secondary">{product.categoria}</span>
+                  </Card.Text>
+
+                  {/* Ejemplo de un botón en la tarjeta */}
+                  {/* <Button variant="primary" className="mt-3">Ver Detalles</Button> */}
+                </Card.Body>
+              </Card>
+            </Col>
           ))}
-        </div>
+        </Row>
       )}
-    </div>
+    </Container>
   );
 };
 
