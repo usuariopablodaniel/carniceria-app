@@ -1,58 +1,66 @@
-import React from 'react'; // Asegúrate de importar React
-import './App.css'; // Si quieres mantener tu CSS
+import React from 'react';
+import './App.css';
+import 'bootstrap/dist/css/bootstrap.min.css';
 
-// Importaciones de React Router DOM
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import AppNavbar from './components/AppNavbar';
 
-import AppNavbar from './components/AppNavbar'; // Asegúrate de que la ruta sea correcta
+import { AuthProvider } from './context/AuthContext';
+import PrivateRoute from './routes/PrivateRoute'; // <--- ¡Nueva importación! Ajusta la ruta si lo pusiste en otro lado.
 
-// ... otras importaciones
-import ProductListPage from './pages/ProductListPage'; // <-- Añade esta línea
-
-// Importa tus componentes de página. Si no los tienes creados, no te preocupes,
-// los haremos más adelante, pero necesitamos los imports para las rutas.
-// Por ahora, asumiremos que tienes (o crearás):
-import HomePage from './pages/HomePage'; // Para la ruta principal '/'
-import LoginPage from './pages/LoginPage'; // Para la ruta de login '/login'
-import DashboardPage from './pages/DashboardPage'; // Para la ruta '/dashboard' (donde redirigiremos después del login de Google)
+import HomePage from './pages/HomePage';
+import LoginPage from './pages/LoginPage';
+import DashboardPage from './pages/DashboardPage';
 import ProductAddPage from './pages/ProductAddPage';
+import ProductListPage from './pages/ProductListPage'; // ProductListPage a veces se deja pública para mostrar el catálogo
 import RegisterPage from './pages/RegisterPage';
-// *** NUEVA IMPORTACIÓN: El componente para manejar el éxito de Google ***
 import AuthSuccessHandler from './components/AuthSuccessHandler';
 
 
 function App() {
   return (
-    // Envuelve toda tu aplicación con Router
     <Router>
-      <div className="App">
-        {/* Aquí podrías tener un Navbar o componentes comunes a todas las páginas */}
-        <AppNavbar />
-        {/* Aquí defines tus rutas usando Routes y Route */}
-        <Routes>
-          {/* Ruta para la página de inicio */}
-          <Route path="/" element={<HomePage />} />
+      <AuthProvider>
+        <div className="App">
+          <AppNavbar />
+          <main>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/auth-success" element={<AuthSuccessHandler />} />
 
-          {/* Ruta para la página de login */}
-          <Route path="/login" element={<LoginPage />} />
+              {/* Ruta de Productos: Podemos dejarla pública o protegerla.
+                 Por ahora, la dejaré pública para que los usuarios puedan ver el catálogo.
+                 Si quieres que solo los logueados vean productos, envuélvela también.
+              */}
+              <Route path="/products" element={<ProductListPage />} />
 
-          {/* Ruta para el Dashboard (donde el usuario va después de iniciar sesión) */}
-          <Route path="/dashboard" element={<DashboardPage />} />
-
-           {/* *** RUTA PARA LA PÁGINA DE REGISTRO *** */}
-          <Route path="/register" element={<RegisterPage />} />
-
-          {/* *** LA RUTA CRÍTICA PARA MANEJAR EL TOKEN DE GOOGLE *** */}
-          <Route path="/auth-success" element={<AuthSuccessHandler />} />
-          <Route path="/products" element={<ProductListPage />} /> {/* <-- Añade esta línea */}
-          <Route path="/products/add" element={<ProductAddPage />} /> {/* <-- ¡Asegúrate que esta línea esté! */}
-
-          {/* Puedes añadir una ruta para un 404 Not Found si lo deseas */}
-          {/* <Route path="*" element={<h1>404 - Página no encontrada</h1>} /> */}
-        </Routes>
-
-        {/* Aquí podrías tener un Footer o componentes comunes al final de las páginas */}
-      </div>
+              {/* RUTAS PROTEGIDAS */}
+              {/* Para Dashboard */}
+              <Route
+                path="/dashboard"
+                element={
+                  <PrivateRoute> {/* <--- ¡Aquí lo envolvemos! */}
+                    <DashboardPage />
+                  </PrivateRoute>
+                }
+              />
+              {/* Para añadir productos (generalmente solo admin/autenticados) */}
+              <Route
+                path="/products/add"
+                element={
+                  <PrivateRoute> {/* <--- ¡Aquí lo envolvemos! */}
+                    <ProductAddPage />
+                  </PrivateRoute>
+                }
+              />
+              {/* Puedes añadir una ruta para un 404 Not Found si lo deseas */}
+              {/* <Route path="*" element={<h1>404 - Página no encontrada</h1>} /> */}
+            </Routes>
+          </main>
+        </div>
+      </AuthProvider>
     </Router>
   );
 }

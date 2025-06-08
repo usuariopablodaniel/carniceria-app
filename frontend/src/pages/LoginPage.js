@@ -1,72 +1,73 @@
-import React, { useState } from 'react'; // Importamos useState para manejar los estados del formulario
-import { Container, Form, Button, Card, Row, Col, Alert } from 'react-bootstrap'; // Importamos componentes de react-bootstrap
-// Importar Link de react-router-dom si lo usas para la navegación a otras páginas (ej. registro)
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react'; // Necesitamos useState para el estado del formulario
+import { Form, Button, Container, Row, Col, Alert } from 'react-bootstrap'; // Importa componentes de Bootstrap
+import { useAuth } from '../context/AuthContext'; // Importa el hook useAuth
 
 const LoginPage = () => {
+  // Usamos el hook useAuth para acceder a la función login
+  const { login } = useAuth();
+
+  // Estados para los campos del formulario
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false); // Para mostrar un spinner de carga
+  // Estado para manejar mensajes de error (opcional)
+  const [error, setError] = useState('');
+  // Estado para simular la carga (opcional)
+  const [loading, setLoading] = useState(false);
 
-  // Función para manejar el login tradicional con email y contraseña
-  const handleEmailPasswordLogin = async (e) => {
+  const handleSubmit = async (e) => {
+    console.log('handleSubmit se está ejecutando.');
     e.preventDefault(); // Previene el comportamiento por defecto del formulario (recargar la página)
-    setError(null); // Limpiamos errores previos
-    setLoading(true); // Indicamos que estamos cargando
+    setError(''); // Limpia cualquier error anterior
+    setLoading(true); // Indica que la operación de login está en curso
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', { // Asegúrate de que esta URL sea la correcta de tu backend
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        // Suponiendo que el backend devuelve un token o alguna confirmación de éxito
-        console.log('Login exitoso:', data);
-        // Aquí podrías guardar el token en localStorage o en el contexto de la app
-        // localStorage.setItem('token', data.token);
-        // Redirigir al usuario al dashboard o a la página de productos
-        // window.location.href = '/dashboard'; // O '/products'
-        alert('Login exitoso (funcionalidad de redirección y token pendiente)'); // Mensaje temporal
-      } else {
-        // Manejo de errores del backend (ej. credenciales inválidas)
-        setError(data.message || 'Error en el login. Verifica tus credenciales.');
+      // --- Validaciones básicas (puedes añadir más) ---
+      if (!email || !password) {
+        setError('Por favor, ingresa tu email y contraseña.');
+        setLoading(false);
+        return;
       }
+
+      // --- Simulación de llamada a una API de autenticación ---
+      // En una aplicación real, aquí harías una llamada HTTP a tu backend
+      // Por ejemplo: const response = await api.post('/auth/login', { email, password });
+      // const token = response.data.token;
+      // const userData = response.data.user;
+
+      // Por ahora, simulamos un delay y un token fijo
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simula un delay de 1 segundo
+
+      // Si las credenciales son "correctas" para nuestra simulación
+      if (email === 'test@example.com' && password === 'password123') {
+        const simulatedToken = 'simulated-jwt-token-for-test-user';
+        const simulatedUserData = { email: 'test@example.com', name: 'Usuario de Prueba' };
+        login(simulatedToken, simulatedUserData); // Llama a la función login del AuthContext
+        // El AuthContext ya se encargará de redirigir a /dashboard
+      } else {
+        setError('Credenciales incorrectas. Inténtalo de nuevo con test@example.com / password123');
+      }
+
     } catch (err) {
-      console.error("Error de red o del servidor al intentar iniciar sesión:", err);
-      setError('No se pudo conectar con el servidor. Inténtalo de nuevo más tarde.');
+      // Manejo de errores en caso de que la llamada a la API falle
+      console.error("Error durante el login simulado:", err);
+      setError('Ocurrió un error al intentar iniciar sesión. Por favor, inténtalo más tarde.');
     } finally {
-      setLoading(false); // Finalizamos la carga
+      setLoading(false); // Siempre resetea el estado de carga
     }
   };
 
-  // Función para redirigir a la autenticación de Google
-  const handleGoogleLogin = () => {
-    window.location.href = 'http://localhost:5000/api/auth/google';
-  };
-
   return (
-    <Container className="my-5 d-flex justify-content-center"> {/* Centramos el contenido en la página */}
-      <Card className="p-4 shadow" style={{ maxWidth: '450px', width: '100%' }}> {/* Tarjeta principal para el formulario */}
-        <Card.Body>
-          <h2 className="text-center mb-4">Iniciar Sesión</h2>
-
-          {/* Mensaje de error */}
-          {error && <Alert variant="danger" className="text-center">{error}</Alert>}
-
-          {/* Formulario de inicio de sesión tradicional */}
-          <Form onSubmit={handleEmailPasswordLogin}>
+    <Container className="mt-5">
+      <Row className="justify-content-md-center">
+        <Col md={6}>
+          <h1 className="text-center mb-4">Iniciar Sesión</h1>
+          {error && <Alert variant="danger">{error}</Alert>} {/* Muestra el mensaje de error */}
+          <Form onSubmit={handleSubmit}>
             <Form.Group className="mb-3" controlId="formBasicEmail">
-              <Form.Label>Correo Electrónico</Form.Label>
+              <Form.Label>Email</Form.Label>
               <Form.Control
                 type="email"
-                placeholder="Ingresa tu correo"
+                placeholder="Ingresa tu email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -84,30 +85,27 @@ const LoginPage = () => {
               />
             </Form.Group>
 
-            <Button variant="primary" type="submit" className="w-100" disabled={loading}>
-              {loading ? 'Iniciando Sesión...' : 'Iniciar Sesión'}
+            <Button
+              variant="primary"
+              type="submit"
+              className="w-100"
+              disabled={loading} // Deshabilita el botón mientras se está cargando
+            >
+              {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </Button>
           </Form>
 
-          <hr className="my-4" /> {/* Separador */}
+          {/* Botón de Google (lo conectaremos en el siguiente paso) */}
+          <div className="text-center mt-3">
+            <p>- O -</p>
+            {/* Por ahora, esto es solo un botón sin funcionalidad */}
+            <Button variant="outline-danger" className="w-100">
+              Iniciar Sesión con Google
+            </Button>
+          </div>
 
-          <h5 className="text-center mb-3">O inicia sesión con:</h5>
-          <Button variant="outline-danger" className="w-100 d-flex align-items-center justify-content-center" onClick={handleGoogleLogin}>
-            {/* Ícono de Google si lo tienes, por ejemplo de 'react-icons' */}
-            {/* <img src="/path/to/google-icon.png" alt="Google" style={{ width: '20px', marginRight: '10px' }} /> */}
-            <i className="bi bi-google me-2"></i> {/* Si usas Bootstrap Icons */}
-            Iniciar sesión con Google
-          </Button>
-
-          {/* Opcional: Enlace a la página de registro si tienes una */}
-          {
-          <p className="text-center mt-3">
-            ¿No tienes cuenta? <Link to="/register">Regístrate aquí</Link>
-          </p>
-          }
-
-        </Card.Body>
-      </Card>
+        </Col>
+      </Row>
     </Container>
   );
 };
