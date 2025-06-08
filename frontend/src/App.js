@@ -4,6 +4,8 @@ import './App.css'; // Si quieres mantener tu CSS
 // Importaciones de React Router DOM
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
+import AppNavbar from './components/AppNavbar'; // Asegúrate de que la ruta sea correcta
+
 // ... otras importaciones
 import ProductListPage from './pages/ProductListPage'; // <-- Añade esta línea
 
@@ -18,13 +20,14 @@ import RegisterPage from './pages/RegisterPage';
 // *** NUEVA IMPORTACIÓN: El componente para manejar el éxito de Google ***
 import AuthSuccessHandler from './components/AuthSuccessHandler';
 
+
 function App() {
   return (
     // Envuelve toda tu aplicación con Router
     <Router>
       <div className="App">
         {/* Aquí podrías tener un Navbar o componentes comunes a todas las páginas */}
-
+        <AppNavbar />
         {/* Aquí defines tus rutas usando Routes y Route */}
         <Routes>
           {/* Ruta para la página de inicio */}
