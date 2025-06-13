@@ -1,22 +1,20 @@
-import React, { useState } from 'react'; // Necesitamos useState para el estado del formulario
-import { Form, Button, Container, Row, Col, Alert } from 'react-bootstrap'; // Importa componentes de Bootstrap
-import { useAuth } from '../context/AuthContext'; // Importa el hook useAuth
+import React, { useState } from 'react';
+import { Form, Button, Container, Row, Col, Alert } from 'react-bootstrap';
+import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
+
 
 const LoginPage = () => {
-  // Usamos el hook useAuth para acceder a la función login
   const { login } = useAuth();
 
-  // Estados para los campos del formulario
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  // Estado para manejar mensajes de error (opcional)
   const [error, setError] = useState('');
-  // Estado para simular la carga (opcional)
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     console.log('handleSubmit se está ejecutando.');
-    e.preventDefault(); // Previene el comportamiento por defecto del formulario (recargar la página)
+    e.preventDefault(); // Previene el comportamiento por defecto del formulario
     setError(''); // Limpia cualquier error anterior
     setLoading(true); // Indica que la operación de login está en curso
 
@@ -28,40 +26,51 @@ const LoginPage = () => {
         return;
       }
 
-      // --- Simulación de llamada a una API de autenticación ---
-      // En una aplicación real, aquí harías una llamada HTTP a tu backend
-      // Por ejemplo: const response = await api.post('/auth/login', { email, password });
-      // const token = response.data.token;
-      // const userData = response.data.user;
+      // --- CAMBIO CLAVE AQUÍ: Llamada REAL a tu API de autenticación ---
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-      // Por ahora, simulamos un delay y un token fijo
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simula un delay de 1 segundo
-
-      // Si las credenciales son "correctas" para nuestra simulación
-      if (email === 'test@example.com' && password === 'password123') {
-        const simulatedToken = 'simulated-jwt-token-for-test-user';
-        const simulatedUserData = { email: 'test@example.com', name: 'Usuario de Prueba' };
-        login(simulatedToken, simulatedUserData); // Llama a la función login del AuthContext
-        // El AuthContext ya se encargará de redirigir a /dashboard
-      } else {
-        setError('Credenciales incorrectas. Inténtalo de nuevo con test@example.com / password123');
+      if (!response.ok) {
+        // Si la respuesta no es 2xx OK, hay un error
+        const errorData = await response.json(); // Tu backend debería enviar un JSON con el error
+        throw new Error(errorData.error || 'Credenciales incorrectas o error de servidor.');
       }
 
+      // Si la respuesta es exitosa, parsea el JSON
+      const data = await response.json();
+      console.log("Respuesta del backend (Login tradicional):", data);
+
+      // Llama a la función login del AuthContext con el token y los datos de usuario REALES
+      login(data.token, data.cliente); // Asegúrate de que tu backend envía 'token' y 'cliente'
+
     } catch (err) {
-      // Manejo de errores en caso de que la llamada a la API falle
-      console.error("Error durante el login simulado:", err);
-      setError('Ocurrió un error al intentar iniciar sesión. Por favor, inténtalo más tarde.');
+      // Manejo de errores de la API o de la red
+      console.error("Error durante el login:", err.message);
+      setError(err.message || 'Ocurrió un error al intentar iniciar sesión. Por favor, inténtalo más tarde.');
     } finally {
       setLoading(false); // Siempre resetea el estado de carga
     }
   };
+
+  // --- El resto del código del componente LoginPage, incluyendo googleLogin, no cambia ---
+  // ... (Tu código para googleLogin y el return JSX) ...
+
+  const handleGoogleLoginRedirect = () => {
+    window.location.href = 'http://localhost:5000/api/auth/google';
+  };
+
 
   return (
     <Container className="mt-5">
       <Row className="justify-content-md-center">
         <Col md={6}>
           <h1 className="text-center mb-4">Iniciar Sesión</h1>
-          {error && <Alert variant="danger">{error}</Alert>} {/* Muestra el mensaje de error */}
+          {error && <Alert variant="danger">{error}</Alert>}
           <Form onSubmit={handleSubmit}>
             <Form.Group className="mb-3" controlId="formBasicEmail">
               <Form.Label>Email</Form.Label>
@@ -89,19 +98,26 @@ const LoginPage = () => {
               variant="primary"
               type="submit"
               className="w-100"
-              disabled={loading} // Deshabilita el botón mientras se está cargando
+              disabled={loading}
             >
               {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </Button>
           </Form>
 
-          {/* Botón de Google (lo conectaremos en el siguiente paso) */}
           <div className="text-center mt-3">
             <p>- O -</p>
-            {/* Por ahora, esto es solo un botón sin funcionalidad */}
-            <Button variant="outline-danger" className="w-100">
+            <Button
+              variant="outline-danger"
+              className="w-100"
+              onClick={handleGoogleLoginRedirect}
+              disabled={loading}
+            >
               Iniciar Sesión con Google
             </Button>
+          </div>
+
+          <div className="text-center mt-3">
+            <p>¿No tienes cuenta? <Link to="/register">Regístrate aquí</Link>.</p>
           </div>
 
         </Col>

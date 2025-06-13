@@ -75,27 +75,34 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
-    if (!email || !password) {
-        return res.status(400).json({ error: 'Email y contraseña son obligatorios.' });
-    }
+    console.log('Intento de login para email:', email);
+    console.log('Contraseña recibida (frontend):', password); // NO HACER ESTO EN PRODUCCIÓN, solo para depuración
 
     try {
-        const user = await pool.query('SELECT * FROM clientes WHERE email = $1', [email]);
-        if (user.rows.length === 0) {
+        // 1. Buscar al cliente por email
+        const clientQuery = 'SELECT * FROM clientes WHERE email = $1';
+        const result = await pool.query(clientQuery, [email]);
+        const cliente = result.rows[0];
+
+        if (!cliente) {
+            console.log('Cliente no encontrado para el email:', email);
             return res.status(400).json({ error: 'Credenciales inválidas.' });
         }
 
-        const cliente = user.rows[0];
+        console.log('Cliente encontrado en BD:', cliente.email);
+        console.log('Hash de contraseña almacenado (BD):', cliente.password_hash);
 
-        if (!cliente.password_hash) {
-            return res.status(400).json({ error: 'Este usuario se registró con autenticación externa. Por favor, inicia sesión con ese método.' });
-        }
-
+        // 2. Comparar la contraseña enviada con el hash almacenado
         const isMatch = await bcrypt.compare(password, cliente.password_hash);
+
+        console.log('Resultado de bcrypt.compare:', isMatch); // ¡ESTO ES CLAVE!
+
         if (!isMatch) {
+            console.log('Contraseña NO coincide para el email:', email);
             return res.status(400).json({ error: 'Credenciales inválidas.' });
         }
 
+        // Si la contraseña coincide, generar JWT
         const token = jwt.sign(
             { id: cliente.id, email: cliente.email },
             jwtSecret,
@@ -114,8 +121,8 @@ router.post('/login', async (req, res) => {
         });
 
     } catch (err) {
-        console.error('Error al iniciar sesión:', err.message);
-        res.status(500).json({ error: 'Error interno del servidor al iniciar sesión.' });
+        console.error('Error durante el login:', err);
+        res.status(500).json({ error: 'Error del servidor al intentar iniciar sesión.' });
     }
 });
 

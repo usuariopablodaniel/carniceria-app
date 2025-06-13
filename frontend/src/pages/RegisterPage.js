@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { Container, Form, Button, Card, Alert } from 'react-bootstrap';
-import { Link } from 'react-router-dom'; // Importamos Link para el enlace de "Ya tienes cuenta?"
+import { Link, useNavigate } from 'react-router-dom'; // Importamos Link y useNavigate
 
 const RegisterPage = () => {
+  const [nombre, setNombre] = useState(''); // <--- NUEVO ESTADO PARA EL NOMBRE
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null); // Para mostrar mensaje de éxito
+  const [success, setSuccess] = useState(null);
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate(); // Inicializar useNavigate para redirigir
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -22,31 +24,39 @@ const RegisterPage = () => {
       return;
     }
 
+    // Validación extra para 'nombre'
+    if (!nombre) {
+      setError('Por favor, ingresa tu nombre.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      // ASEGÚRATE DE QUE ESTA URL SEA LA CORRECTA DE TU BACKEND PARA REGISTRO
-      // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       const response = await fetch('http://localhost:5000/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        // --- CAMBIO AQUÍ: ENVIAR 'nombre' Y 'telefono' (si lo añades al form) ---
+        body: JSON.stringify({ nombre, email, password /* , telefono: '' */ }), // Asegúrate de que el 'telefono' se envíe o quítalo del backend si no lo necesitas
       });
 
       const data = await response.json();
 
       if (response.ok) {
         setSuccess(data.message || 'Registro exitoso. ¡Ahora puedes iniciar sesión!');
-        setEmail(''); // Limpiar formulario
+        setNombre(''); // Limpiar formulario
+        setEmail('');
         setPassword('');
         setConfirmPassword('');
+        // setTelefono(''); // Si añades el campo telefono
+
         // Opcional: Redirigir automáticamente al login después de un registro exitoso
-        // setTimeout(() => {
-        //   window.location.href = '/login';
-        // }, 2000);
+        setTimeout(() => {
+           navigate('/login'); // Usa navigate para redirigir
+        }, 2000); // Espera 2 segundos antes de redirigir
       } else {
-        setError(data.message || 'Error en el registro. Inténtalo de nuevo.');
+        setError(data.error || data.message || 'Error en el registro. Inténtalo de nuevo.'); // Tu backend envía 'error', no 'message' en caso de fallo
       }
     } catch (err) {
       console.error("Error de red o del servidor al intentar registrarse:", err);
@@ -66,6 +76,19 @@ const RegisterPage = () => {
           {success && <Alert variant="success" className="text-center">{success}</Alert>}
 
           <Form onSubmit={handleRegister}>
+            {/* --- NUEVO CAMPO: NOMBRE --- */}
+            <Form.Group className="mb-3" controlId="formRegisterNombre">
+              <Form.Label>Nombre</Form.Label>
+              <Form.Control
+                type="text"
+                placeholder="Ingresa tu nombre"
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                required
+              />
+            </Form.Group>
+            {/* --------------------------- */}
+
             <Form.Group className="mb-3" controlId="formRegisterEmail">
               <Form.Label>Correo Electrónico</Form.Label>
               <Form.Control
@@ -99,13 +122,26 @@ const RegisterPage = () => {
               />
             </Form.Group>
 
+            {/* Si quieres añadir 'Teléfono' también, el código sería similar: */}
+            {/*
+            <Form.Group className="mb-3" controlId="formRegisterTelefono">
+              <Form.Label>Teléfono (opcional)</Form.Label>
+              <Form.Control
+                type="tel"
+                placeholder="Ingresa tu teléfono"
+                value={telefono} // Necesitas un useState para telefono
+                onChange={(e) => setTelefono(e.target.value)} // Necesitas un setTelefono
+              />
+            </Form.Group>
+            */}
+
             <Button variant="success" type="submit" className="w-100" disabled={loading}>
               {loading ? 'Registrando...' : 'Crear Cuenta'}
             </Button>
           </Form>
 
           <p className="text-center mt-3">
-            ¿Ya tienes cuenta? <Link to="/login">Inicia sesión aquí</Link> {/* Usamos Link de react-router-dom */}
+            ¿Ya tienes cuenta? <Link to="/login">Inicia sesión aquí</Link>
           </p>
 
         </Card.Body>
