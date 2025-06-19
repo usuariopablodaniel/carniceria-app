@@ -1,56 +1,60 @@
 import React, { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext'; // <--- ¡Importa tu hook useAuth!
+import { useAuth } from '../context/AuthContext';
 
 const AuthSuccessHandler = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { login } = useAuth(); // <--- ¡Obtenemos la función login del contexto!
+  const { login, isAuthenticated } = useAuth(); // Obtener también isAuthenticated
 
   useEffect(() => {
-    // Obtener el token de la URL (ej. ?token=XYZ)
+    // Si ya estamos autenticados y no estamos en la URL con parámetros de token,
+    // o si el token ya ha sido procesado, no hacer nada aquí.
+    if (isAuthenticated && !location.search.includes('token=')) {
+        // console.log('AuthSuccessHandler: Ya autenticado y sin token en URL. No se requiere acción.');
+        return;
+    }
+
     const params = new URLSearchParams(location.search);
     const token = params.get('token');
 
-    console.log('Token JWT recibido:', token);
+    console.log('AuthSuccessHandler: Token JWT recibido:', token ? 'Existe' : 'No existe');
 
     if (token) {
-      // Aquí puedes (opcionalmente) decodificar el token para obtener datos básicos del usuario
-      // o hacer una llamada a tu backend para obtener el perfil completo del usuario.
-      // Por ahora, vamos a simular los datos del usuario o usar un valor por defecto.
-
-      // --- Decodificación simple del token (opcional, para obtener el email/id del token) ---
-      let userData = { email: 'unknown@example.com', name: 'Usuario Google' }; // Valores por defecto
-      try {
-        const payloadBase64 = token.split('.')[1]; // El payload es la segunda parte del JWT
-        const decodedPayload = JSON.parse(atob(payloadBase64)); // Decodificar de base64 y parsear JSON
-        if (decodedPayload.email) {
-          userData.email = decodedPayload.email;
+      // Intenta obtener datos de la URL si están presentes (como en Google OAuth)
+      const userFromUrl = {};
+      for (let [key, value] of params.entries()) {
+        if (key !== 'token') { // Excluir el token mismo
+          userFromUrl[key] = value;
         }
-        if (decodedPayload.nombre) { // Si tu token incluye un campo 'nombre'
-          userData.name = decodedPayload.nombre;
-        } else if (decodedPayload.name) { // Si tu token incluye un campo 'name'
-          userData.name = decodedPayload.name;
-        }
-        // Puedes añadir más campos si tu JWT los tiene (ej. id, puntos_actuales)
-        // userData.id = decodedPayload.id;
-        // userData.puntos_actuales = decodedPayload.puntos_actuales;
-
-      } catch (e) {
-        console.error("Error decodificando token JWT:", e);
       }
 
-      // --- Llamar a la función login del AuthContext con el token y datos del usuario ---
-      login(token, userData); // Pasa el token y los datos de usuario a tu AuthContext
+      console.log('AuthSuccessHandler: Datos de usuario de URL:', userFromUrl);
 
-      // Redirigir al dashboard después de que el login se haya procesado
+      // Usar los datos de userFromUrl directamente o decodificar el token si es necesario
+      login(token, userFromUrl); // Llama a la función login del AuthContext
+
+      // Limpiar los parámetros de la URL para evitar re-procesamientos
+      // No podemos limpiar location.search directamente en React Router v6 con navigate
+      // Pero podemos redirigir a una URL limpia.
+      
+      // *** IMPORTANTE: Redirigir a la página que el usuario quería ir ANTES del login,
+      // O a un dashboard por defecto.
+      // Por ahora, lo mantenemos simple. Si quieres una redirección "inteligente"
+      // necesitaríamos guardar la ruta "intended" antes del login.
       navigate('/dashboard', { replace: true });
+
     } else {
-      // Si no hay token, redirigir al login o a una página de error
-      console.error('No se recibió token JWT en la URL.');
-      navigate('/login', { replace: true });
+      console.error('AuthSuccessHandler: No se recibió token JWT en la URL.');
+      // Si no hay token en la URL, y el usuario no está autenticado, redirigir a login
+      if (!isAuthenticated) {
+        navigate('/login', { replace: true });
+      } else {
+        // Si ya está autenticado pero llega aquí sin token, simplemente ir al dashboard
+        navigate('/dashboard', { replace: true });
+      }
     }
-  }, [location, navigate, login]); // Asegúrate de que 'login' esté en las dependencias del useEffect
+  }, [location, navigate, login, isAuthenticated]); // Añadir isAuthenticated a las dependencias
 
   return (
     <div className="container mt-5 text-center">

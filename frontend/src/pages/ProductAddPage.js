@@ -1,8 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // Asegúrate de tener useEffect importado
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext'; // <--- Añade esta importación
 
 const ProductAddPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth(); // <--- Añade esta línea para obtener el usuario
+
+  // AHORA SÍ, vamos a añadir los console.log y el useEffect para depurar
+  console.log('--- ProductAddPage: Componente renderizado ---');
+  console.log('Usuario actual en ProductAddPage:', user);
+
   const [formData, setFormData] = useState({
     nombre: '',
     descripcion: '',
@@ -16,6 +23,18 @@ const ProductAddPage = () => {
   const [message, setMessage] = useState(''); // Para mensajes de éxito o error
   const [error, setError] = useState(''); // Para errores específicos
 
+  // useEffect para depurar la carga inicial y verificar el rol (si es necesario)
+  useEffect(() => {
+    console.log('ProductAddPage: useEffect de carga inicial disparado.');
+    // Si quieres que solo los administradores puedan acceder, y tienes un campo 'es_admin' en tu usuario:
+    // if (user && user.role !== 'admin') { // Asumiendo que tienes un campo 'role' en tu objeto user
+    //   console.log('ProductAddPage: Usuario no es administrador. Redirigiendo a /dashboard.');
+    //   navigate('/dashboard', { replace: true });
+    // }
+    // O si es solo para usuarios logueados, la PrivateRoute ya lo maneja
+  }, [user, navigate]);
+
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData({
@@ -27,7 +46,7 @@ const ProductAddPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage(''); // Limpiar mensajes anteriores
-    setError('');   // Limpiar errores anteriores
+    setError('');    // Limpiar errores anteriores
 
     // Validación básica
     if (!formData.nombre || !formData.precio || !formData.stock) {
@@ -44,13 +63,15 @@ const ProductAddPage = () => {
     }
 
     try {
-      const token = localStorage.getItem('jwtToken'); // Obtener el token del localStorage
+      // ESTA ES LA LÍNEA A CAMBIAR
+      const token = localStorage.getItem('token'); // Obtener el token del localStorage (¡con 't' minúscula!)
       if (!token) {
         setError('No estás autenticado. Por favor, inicia sesión.');
         navigate('/login'); // Redirigir al login si no hay token
         return;
       }
 
+      console.log('ProductAddPage: Enviando datos:', formData); // Depurar datos a enviar
       const response = await fetch('http://localhost:5000/api/products', {
         method: 'POST',
         headers: {
@@ -65,6 +86,7 @@ const ProductAddPage = () => {
       });
 
       const data = await response.json();
+      console.log('ProductAddPage: Respuesta del servidor:', data); // Depurar respuesta del servidor
 
       if (response.ok) {
         setMessage('Producto añadido exitosamente!');
@@ -79,7 +101,7 @@ const ProductAddPage = () => {
           disponible: true,
         });
         // Opcional: Redirigir a la lista de productos
-        navigate('/products');
+        navigate('/products', { replace: true });
       } else {
         setError(data.error || 'Error al añadir el producto.');
       }

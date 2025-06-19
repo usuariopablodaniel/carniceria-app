@@ -1,67 +1,24 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+// frontend/src/context/AuthContext.js
+
+import React, { createContext, useState, useContext, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
-const AuthContext = createContext();
+const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loadingAuth, setLoadingAuth] = useState(true); // <-- NUEVO ESTADO DE CARGA DE AUTENTICACIÓN
+
   const navigate = useNavigate();
   const location = useLocation();
 
-  const login = (newToken, userData) => {
-    console.log("--- Función login del AuthContext iniciada ---");
-    setToken(newToken);
-    setUser(userData);
-    setIsAuthenticated(true);
-    localStorage.setItem('token', newToken);
-    localStorage.setItem('user', JSON.stringify(userData));
-    console.log("✅ Todos los estados de login actualizados. Preparando redirección...");
-    console.log("--- Función login del AuthContext finalizada ---");
-  };
-
-  const logout = () => {
-    console.log("--- Función logout del AuthContext iniciada ---");
-    setToken(null);
-    setUser(null);
-    setIsAuthenticated(false);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    console.log("--- Función logout del AuthContext finalizada ---");
-  };
-
-  // Efecto para inicializar el estado de autenticación desde localStorage o URL
+  // useEffect para cargar el token y usuario del localStorage al inicio
   useEffect(() => {
-    console.log("--- useEffect de AuthProvider iniciado ---");
-
-    const params = new URLSearchParams(location.search);
-    const urlToken = params.get('token');
-    const urlCliente = params.get('cliente');
-
-    // **PRIORIZAR SIEMPRE LOS PARÁMETROS DE LA URL SI EXISTEN (para Google OAuth)**
-    if (urlToken && urlCliente) {
-      try {
-        const parsedUrlCliente = JSON.parse(decodeURIComponent(urlCliente));
-        
-        console.log("DEBUG: Procesando datos desde URL:", parsedUrlCliente); // DEBUG
-        login(urlToken, parsedUrlCliente); // Llama a la función login del contexto
-        console.log("✅ Sesión establecida desde parámetros de URL (Google OAuth).");
-        
-        // Limpiar los parámetros de la URL para que no queden visibles o se reprocesen
-        navigate(location.pathname, { replace: true });
-        return; // ¡Importante! Termina aquí si se procesó la URL.
-
-      } catch (e) {
-        console.error("Error al procesar parámetros de URL (Google OAuth):", e);
-        // Opcional: Redirigir a login en caso de error de procesamiento
-        // navigate('/login', { replace: true });
-      }
-    }
-
-    // Si no hay parámetros en la URL, intentar cargar desde localStorage
+    console.log('--- useEffect de AuthProvider iniciado ---');
     const storedToken = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
+    const storedUser = localStorage.getItem('user'); // Asegúrate de guardar el objeto user también
 
     if (storedToken && storedUser) {
       try {
@@ -69,30 +26,58 @@ export const AuthProvider = ({ children }) => {
         setToken(storedToken);
         setUser(parsedUser);
         setIsAuthenticated(true);
-        console.log("✅ Sesión restaurada desde localStorage.");
+        console.log('✅ Sesión restaurada desde localStorage.');
       } catch (e) {
-        console.error("Error al parsear usuario de localStorage:", e);
+        console.error("Error al parsear usuario desde localStorage:", e);
+        // Limpiar si hay un error en el localStorage
         localStorage.removeItem('token');
         localStorage.removeItem('user');
       }
     }
-    console.log("--- useEffect de AuthProvider finalizado ---");
-  }, [location.search]); // Dependencia de location.search para que se re-ejecute si la URL cambia
+    setLoadingAuth(false); // <-- Una vez que se ha comprobado el localStorage, la carga ha terminado
+    console.log('--- useEffect de AuthProvider finalizado ---');
+  }, []); // Se ejecuta solo una vez al montar
 
-  // Si isAuthenticated es true y la URL no es /dashboard, redirigir al dashboard.
-  // Esto puede ser útil si el usuario está logueado pero intenta ir a /login o /register directamente.
+  // Función de login (para login normal y Google OAuth)
+  const login = (newToken, userData) => {
+    console.log('--- Función login del AuthContext iniciada ---');
+    localStorage.setItem('token', newToken);
+    localStorage.setItem('user', JSON.stringify(userData)); // Guardar el objeto user
+    setToken(newToken);
+    setUser(userData);
+    setIsAuthenticated(true);
+    console.log('✅ Todos los estados de login actualizados. Preparando redirección...');
+    console.log('--- Función login del AuthContext finalizada ---');
+  };
+
+  // Función de logout
+  const logout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setToken(null);
+    setUser(null);
+    setIsAuthenticated(false);
+    console.log('❌ Sesión cerrada y token/usuario eliminados.');
+  };
+
+  // Si isAuthenticated es true, y el usuario está en /login, redirigir a /dashboard
   useEffect(() => {
-    if (isAuthenticated && location.pathname === '/login') { // Solo si está logueado y en /login
-        navigate('/dashboard', { replace: true });
+    if (isAuthenticated && location.pathname === '/login') {
+      navigate('/dashboard', { replace: true });
     }
   }, [isAuthenticated, location.pathname, navigate]);
 
-
   return (
-    <AuthContext.Provider value={{ user, token, isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ user, token, isAuthenticated, login, logout, loadingAuth }}> {/* <-- Añadir loadingAuth */}
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
