@@ -26,7 +26,10 @@ const pool = new Pool({
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: 'http://localhost:3000', // Asegúrate de que esta sea la URL de tu frontend
+    credentials: true // Muy importante para las cookies de sesión de Passport
+}));
 app.use(express.json());
 
 // Configuración de Sesiones para Passport

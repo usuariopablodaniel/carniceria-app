@@ -140,28 +140,58 @@ router.get('/me', protect, async (req, res) => {
 // --- Rutas de Autenticación con Google ---
 
 // 1. Ruta para iniciar la autenticación de Google
-router.get('/google',
-    passport.authenticate('google', { scope: ['profile', 'email'] })
-);
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
-// 2. Ruta de callback de Google
 router.get('/google/callback',
     passport.authenticate('google', { failureRedirect: '/login-failure' }),
-    (req, res) => {
-        const token = jwt.sign(
-            { id: req.user.id, email: req.user.email },
-            process.env.JWT_SECRET,
-            { expiresIn: '1h' }
-        );
+    async (req, res) => { // Asegúrate de que esta sea una función async
+        console.log('--- BACKEND: Ruta /google/callback HA SIDO ALCANZADA ---'); // Mantén este console.log de depuración
 
-        res.redirect(`http://localhost:3000/auth-success?token=${token}`);
+        try {
+            // req.user debería contener el cliente que Passport ha autenticado/creado de la BD.
+            // Asegúrate de que tu GoogleStrategy de Passport esté configurada para devolver el cliente completo de la DB.
+            const cliente = req.user; // Passport.js debería poner el usuario completo de DB aquí
+
+            if (!cliente) {
+                console.error('Error: Cliente no disponible en req.user después de autenticación Google.');
+                return res.redirect('http://localhost:3000/login?error=auth_failed');
+            }
+
+            console.log('Cliente obtenido de Passport.js (Google):', cliente);
+            // Asegúrate de que 'cliente' tenga 'id', 'nombre', 'email', 'puntos_actuales'
+
+            const token = jwt.sign(
+                { id: cliente.id, email: cliente.email }, // Usamos datos del cliente autenticado
+                jwtSecret, // Usa la variable jwtSecret que ya tienes definida
+                { expiresIn: '1h' }
+            );
+
+            console.log('Token JWT generado para Google login.');
+
+            // Preparamos el objeto cliente completo para enviar al frontend
+            const clienteParaFrontend = {
+                id: cliente.id,
+                nombre: cliente.nombre, // ¡Asegúrate de que este campo exista en tu objeto cliente!
+                email: cliente.email,
+                puntos_actuales: cliente.puntos_actuales, // ¡Asegúrate de que este campo exista!
+                // Si tienes otros campos como google_id, también puedes incluirlos
+                google_id: cliente.google_id
+            };
+
+            console.log('Datos de cliente a enviar al frontend para Google login:', clienteParaFrontend);
+
+
+            // Redirige al dashboard, enviando el token y el objeto cliente completo
+            // Asegúrate de que 'http://localhost:3000/dashboard' sea la URL final de redirección
+            // y que el frontend esté configurado para leer 'token' y 'cliente' de la URL.
+            res.redirect(`http://localhost:3000/dashboard?token=${token}&cliente=${encodeURIComponent(JSON.stringify(clienteParaFrontend))}`);
+
+        } catch (err) {
+            console.error('Error en Google callback al procesar cliente:', err);
+            res.redirect('http://localhost:3000/login?error=server_error');
+        }
     }
 );
-
-// Ruta de fallo de autenticación
-router.get('/login-failure', (req, res) => {
-    res.status(401).send('Error de autenticación con Google.');
-});
 
 
 module.exports = router; // Exportamos el router para usarlo en server.js

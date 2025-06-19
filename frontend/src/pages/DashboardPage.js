@@ -1,25 +1,33 @@
-import React from 'react';
-import { useAuth } from '../context/AuthContext'; // Importamos el hook useAuth
-import { Button, Container, Row, Col, Card } from 'react-bootstrap'; // Componentes de Bootstrap
+import React, { useEffect } from 'react';
+import { Container, Row, Col, Card, Button } from 'react-bootstrap';
+import { useAuth } from '../context/AuthContext'; // Importa useAuth
+import { useNavigate } from 'react-router-dom'; // Importa useNavigate
 
 const DashboardPage = () => {
-  // Obtenemos los datos del usuario y la función de logout directamente del AuthContext
-  const { user, logout, isAuthenticated } = useAuth(); // Añadimos isAuthenticated para una doble verificación
+  const { user, logout } = useAuth(); // Obtén el objeto user y la función logout del contexto
+  const navigate = useNavigate();
 
-  // Esta condición es una doble capa de seguridad, aunque PrivateRoute ya debería manejar esto
-  if (!isAuthenticated || !user) {
-    // En una app real, aquí podrías redirigir o mostrar un mensaje de error si el AuthContext no tiene el usuario
-    // Pero PrivateRoute ya debería haber redirigido si no estaba autenticado.
-    // Si el usuario no está, simplemente no se muestra el contenido o se muestra un cargando.
-    // Podríamos redirigir aquí también, pero PrivateRoute ya lo hace.
+  console.log("Contenido del objeto 'user' en DashboardPage:", user);
+
+  // Puedes usar un estado local para la información del usuario si necesitas mutarla
+  // const [currentUser, setCurrentUser] = useState(user);
+
+  useEffect(() => {
+    // Si necesitas hacer algo cuando el componente se monta o cuando 'user' cambia
+    // Por ejemplo, cargar datos adicionales del usuario si no están en el contexto
+  }, [user]);
+
+  const handleLogout = () => {
+    logout(); // Llama a la función de logout del contexto
+    navigate('/login'); // Redirige al usuario a la página de login
+  };
+
+  if (!user) {
+    // Puedes mostrar un spinner de carga o redirigir si el usuario no está logueado
     return (
-      <Container className="mt-5">
-        <Row className="justify-content-md-center">
-          <Col md={6}>
-            <p>Cargando perfil del usuario o usuario no disponible...</p>
-            <p>Si esto persiste, por favor, intenta iniciar sesión de nuevo.</p>
-          </Col>
-        </Row>
+      <Container className="mt-5 text-center">
+        <p>Cargando información del usuario...</p>
+        <Button onClick={() => navigate('/login')}>Ir a Iniciar Sesión</Button>
       </Container>
     );
   }
@@ -28,20 +36,30 @@ const DashboardPage = () => {
     <Container className="mt-5">
       <Row className="justify-content-md-center">
         <Col md={8}>
-          <Card>
-            <Card.Header as="h1" className="text-center">¡Bienvenido al Dashboard, {user.name}!</Card.Header>
+          <Card className="p-4 shadow">
             <Card.Body>
-              <Card.Text>
-                Este es tu espacio personal. Aquí podrás ver y gestionar tu información.
-              </Card.Text>
-              <ul className="list-unstyled">
-                <li><strong>Email:</strong> {user.email}</li>
-                {/* Si tu simulación de usuario no tiene puntos, puedes omitir esta línea */}
-                <li><strong>Puntos actuales:</strong> {user.puntos_actuales || 'No disponible'}</li>
-                {/* Puedes añadir más datos del usuario aquí si los tiene tu objeto 'simulatedUserData' */}
-              </ul>
+              <h1 className="text-center mb-4">¡BIENVENIDO al Dashboard, {user.nombre || 'Usuario'}!</h1>
+              <p className="lead text-center">Aquí puedes gestionar tus actividades y ver tus puntos.</p>
+
+              <hr />
+
+              <div className="mb-4">
+                <h4>Detalles de tu Cuenta:</h4>
+                <p><strong>Email:</strong> {user.email}</p>
+                {/* Asumiendo que tu objeto 'user' tiene una propiedad 'puntos_actuales' */}
+                <p><strong>Puntos Actuales:</strong> {user.puntos_actuales !== undefined ? user.puntos_actuales : 'Cargando...'}</p>
+                {/* Puedes añadir más detalles del usuario si tu objeto 'user' los tiene (ej. teléfono) */}
+                {user.telefono && <p><strong>Teléfono:</strong> {user.telefono}</p>}
+              </div>
+
               <div className="d-grid gap-2">
-                <Button variant="danger" onClick={logout} className="mt-3">
+                <Button variant="primary" size="lg" onClick={() => alert('Funcionalidad de Canjear Puntos pendiente')}>
+                  Canjear Puntos
+                </Button>
+                <Button variant="info" size="lg" onClick={() => alert('Funcionalidad de Escanear QR pendiente')}>
+                  Escanear QR
+                </Button>
+                <Button variant="danger" size="lg" onClick={handleLogout}>
                   Cerrar Sesión
                 </Button>
               </div>
