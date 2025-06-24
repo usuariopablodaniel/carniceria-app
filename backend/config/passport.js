@@ -23,7 +23,8 @@ passport.serializeUser((user, done) => {
 
 passport.deserializeUser(async (id, done) => {
     try {
-        const userResult = await pool.query('SELECT id, nombre, email, puntos_actuales FROM clientes WHERE id = $1', [id]);
+        // MODIFICACIÓN: Añadir 'role' a la SELECT para que esté disponible en req.user
+        const userResult = await pool.query('SELECT id, nombre, email, puntos_actuales, google_id, role FROM clientes WHERE id = $1', [id]);
         if (userResult.rows.length > 0) {
             done(null, userResult.rows[0]); // El usuario se recuperó correctamente
         } else {
@@ -43,17 +44,18 @@ passport.use(new GoogleStrategy({
 },
 async (accessToken, refreshToken, profile, done) => {
     try {
-        // Busca si el usuario ya existe por su ID de Google
-        let user = await pool.query('SELECT * FROM clientes WHERE google_id = $1', [profile.id]);
+        // MODIFICACIÓN: Seleccionar 'role' también al buscar usuario existente por google_id
+        let user = await pool.query('SELECT id, nombre, email, puntos_actuales, google_id, role FROM clientes WHERE google_id = $1', [profile.id]);
 
         if (user.rows.length > 0) {
-            // Usuario ya existe, lo retorna
+            // Usuario ya existe, lo retorna (ahora con el campo 'role' incluido)
             return done(null, user.rows[0]);
         } else {
             // El usuario no existe, crea uno nuevo
+            // MODIFICACIÓN: Incluir 'role' en el INSERT y en RETURNING. Por defecto 'user' para nuevos usuarios de Google.
             const newUser = await pool.query(
-                'INSERT INTO clientes (nombre, email, google_id) VALUES ($1, $2, $3) RETURNING id, nombre, email, puntos_actuales',
-                [profile.displayName, profile.emails[0].value, profile.id]
+                'INSERT INTO clientes (nombre, email, google_id, role) VALUES ($1, $2, $3, $4) RETURNING id, nombre, email, puntos_actuales, google_id, role',
+                [profile.displayName, profile.emails[0].value, profile.id, 'user'] // Añadir 'user' como rol por defecto
             );
             return done(null, newUser.rows[0]);
         }
@@ -62,4 +64,4 @@ async (accessToken, refreshToken, profile, done) => {
     }
 }));
 
-// No exportamos nada de aquí, solo se "configura" passport al requerir este archivo.
+// No exportamos nada de aquí, solo se "configura" passport al requerir este archivo en server.js.

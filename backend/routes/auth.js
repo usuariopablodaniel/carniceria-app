@@ -1,3 +1,4 @@
+// backend/routes/auth.js
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
@@ -5,7 +6,7 @@ const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 
 const { protect } = require('../middleware/authMiddleware');
-const passport = require('passport'); // Esta es la línea que añadimos para Passport
+const passport = require('passport');
 
 // Configuración de la base de datos (usando las variables de entorno de .env)
 const pool = new Pool({
@@ -16,8 +17,10 @@ const pool = new Pool({
     port: process.env.DB_PORT,
 });
 
-// Clave secreta para firmar los tokens JWT
-const jwtSecret = process.env.JWT_SECRET || 'supersecretkey';
+// CLAVE SECRETA PARA FIRMAR LOS TOKENS JWT
+// Esto DEBE ser process.env.JWT_SECRET. El fallback 'supersecretkey_fallback'
+// solo es una medida de seguridad en caso de que .env no cargue (raro).
+const JWT_SECRET_GLOBAL = process.env.JWT_SECRET || 'supersecretkey_fallback'; 
 
 // --- Ruta de Registro de Usuario ---
 router.post('/register', async (req, res) => {
@@ -36,22 +39,23 @@ router.post('/register', async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
 
-        const newUser = await pool.query(
-            'INSERT INTO clientes (nombre, email, password_hash, telefono) VALUES ($1, $2, $3, $4) RETURNING id, nombre, email, puntos_actuales',
-            [nombre, email, passwordHash, telefono]
-        );
+        const newUserQuery = 'INSERT INTO clientes (nombre, email, password_hash, telefono, role) VALUES ($1, $2, $3, $4, $5) RETURNING id, nombre, email, puntos_actuales, role';
+        const newUserValues = [nombre, email, passwordHash, telefono, 'user'];
 
-        const cliente = newUser.rows[0];
+        const newUserResult = await pool.query(newUserQuery, newUserValues);
+        const cliente = newUserResult.rows[0];
 
         await pool.query(
             'INSERT INTO preferencias_notificaciones (cliente_id, recibir_notificaciones, recibir_ofertas_especiales, recibir_recordatorios_puntos) VALUES ($1, $2, $3, $4)',
             [cliente.id, true, true, true]
         );
 
+        // QUITAR ESTA LÍNEA DE DEPURACIÓN (o comentarla)
+        // console.log('JWT_SECRET usado para FIRMAR (auth.js - register):', JWT_SECRET_GLOBAL); 
         const token = jwt.sign(
-            { id: cliente.id, email: cliente.email },
-            jwtSecret,
-            { expiresIn: '1h' }
+            { id: cliente.id, email: cliente.email, role: cliente.role },
+            JWT_SECRET_GLOBAL,
+            { expiresIn: '1h' } 
         );
 
         res.status(201).json({
@@ -62,6 +66,7 @@ router.post('/register', async (req, res) => {
                 nombre: cliente.nombre,
                 email: cliente.email,
                 puntos_actuales: cliente.puntos_actuales,
+                role: cliente.role, 
             },
         });
 
@@ -75,37 +80,36 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
-    console.log('Intento de login para email:', email);
-    console.log('Contraseña recibida (frontend):', password); // NO HACER ESTO EN PRODUCCIÓN, solo para depuración
+    console.log('Intento de login para email:', email); // Mantener esto, es útil para el log de actividad
+    // console.log('Contraseña recibida (frontend):', password); // NO HACER ESTO EN PRODUCCIÓN
 
     try {
-        // 1. Buscar al cliente por email
-        const clientQuery = 'SELECT * FROM clientes WHERE email = $1';
+        const clientQuery = 'SELECT id, nombre, email, puntos_actuales, password_hash, role FROM clientes WHERE email = $1';
         const result = await pool.query(clientQuery, [email]);
         const cliente = result.rows[0];
 
         if (!cliente) {
-            console.log('Cliente no encontrado para el email:', email);
+            console.log('Cliente no encontrado para el email:', email); // Mantener
             return res.status(400).json({ error: 'Credenciales inválidas.' });
         }
 
-        console.log('Cliente encontrado en BD:', cliente.email);
-        console.log('Hash de contraseña almacenado (BD):', cliente.password_hash);
+        console.log('Cliente encontrado en BD:', cliente.email); // Mantener
+        // console.log('Hash de contraseña almacenado (BD):', cliente.password_hash); // Para depuración
 
-        // 2. Comparar la contraseña enviada con el hash almacenado
         const isMatch = await bcrypt.compare(password, cliente.password_hash);
 
-        console.log('Resultado de bcrypt.compare:', isMatch); // ¡ESTO ES CLAVE!
+        console.log('Resultado de bcrypt.compare:', isMatch); // Mantener
 
         if (!isMatch) {
-            console.log('Contraseña NO coincide para el email:', email);
+            console.log('Contraseña NO coincide para el email:', email); // Mantener
             return res.status(400).json({ error: 'Credenciales inválidas.' });
         }
 
-        // Si la contraseña coincide, generar JWT
+        // QUITAR ESTA LÍNEA DE DEPURACIÓN (o comentarla)
+        // console.log('JWT_SECRET usado para FIRMAR (auth.js - login):', JWT_SECRET_GLOBAL); 
         const token = jwt.sign(
-            { id: cliente.id, email: cliente.email },
-            jwtSecret,
+            { id: cliente.id, email: cliente.email, role: cliente.role },
+            JWT_SECRET_GLOBAL,
             { expiresIn: '1h' }
         );
 
@@ -117,11 +121,12 @@ router.post('/login', async (req, res) => {
                 nombre: cliente.nombre,
                 email: cliente.email,
                 puntos_actuales: cliente.puntos_actuales,
+                role: cliente.role, 
             },
         });
 
     } catch (err) {
-        console.error('Error durante el login:', err);
+        console.error('Error durante el login:', err); // Mantener este error
         res.status(500).json({ error: 'Error del servidor al intentar iniciar sesión.' });
     }
 });
@@ -133,6 +138,7 @@ router.get('/me', protect, async (req, res) => {
         nombre: req.user.nombre,
         email: req.user.email,
         puntos_actuales: req.user.puntos_actuales,
+        role: req.user.role, 
     });
 });
 
@@ -144,54 +150,47 @@ router.get('/google', passport.authenticate('google', { scope: ['profile', 'emai
 
 router.get('/google/callback',
     passport.authenticate('google', { failureRedirect: '/login-failure' }),
-    async (req, res) => { // Asegúrate de que esta sea una función async
-        console.log('--- BACKEND: Ruta /google/callback HA SIDO ALCANZADA ---'); // Mantén este console.log de depuración
+    async (req, res) => {
+        console.log('--- BACKEND: Ruta /google/callback HA SIDO ALCANZADA ---'); // Mantener
 
         try {
-            // req.user debería contener el cliente que Passport ha autenticado/creado de la BD.
-            // Asegúrate de que tu GoogleStrategy de Passport esté configurada para devolver el cliente completo de la DB.
-            const cliente = req.user; // Passport.js debería poner el usuario completo de DB aquí
+            const cliente = req.user;
 
             if (!cliente) {
-                console.error('Error: Cliente no disponible en req.user después de autenticación Google.');
+                console.error('Error: Cliente no disponible en req.user después de autenticación Google.'); // Mantener
                 return res.redirect('http://localhost:3000/login?error=auth_failed');
             }
 
-            console.log('Cliente obtenido de Passport.js (Google):', cliente);
-            // Asegúrate de que 'cliente' tenga 'id', 'nombre', 'email', 'puntos_actuales'
-
+            console.log('Cliente obtenido de Passport.js (Google):', cliente); // Mantener
+            
+            // QUITAR ESTA LÍNEA DE DEPURACIÓN (o comentarla)
+            // console.log('JWT_SECRET usado para FIRMAR (auth.js - google callback):', JWT_SECRET_GLOBAL); 
             const token = jwt.sign(
-                { id: cliente.id, email: cliente.email }, // Usamos datos del cliente autenticado
-                jwtSecret, // Usa la variable jwtSecret que ya tienes definida
+                { id: cliente.id, email: cliente.email, role: cliente.role },
+                JWT_SECRET_GLOBAL,
                 { expiresIn: '1h' }
             );
 
-            console.log('Token JWT generado para Google login.');
+            console.log('Token JWT generado para Google login.'); // Mantener
 
-            // Preparamos el objeto cliente completo para enviar al frontend
             const clienteParaFrontend = {
                 id: cliente.id,
-                nombre: cliente.nombre, // ¡Asegúrate de que este campo exista en tu objeto cliente!
+                nombre: cliente.nombre,
                 email: cliente.email,
-                puntos_actuales: cliente.puntos_actuales, // ¡Asegúrate de que este campo exista!
-                // Si tienes otros campos como google_id, también puedes incluirlos
-                google_id: cliente.google_id
+                puntos_actuales: cliente.puntos_actuales,
+                google_id: cliente.google_id,
+                role: cliente.role, 
             };
 
-            console.log('Datos de cliente a enviar al frontend para Google login:', clienteParaFrontend);
+            console.log('Datos de cliente a enviar al frontend para Google login:', clienteParaFrontend); // Mantener
 
-
-            // Redirige al dashboard, enviando el token y el objeto cliente completo
-            // Asegúrate de que 'http://localhost:3000/dashboard' sea la URL final de redirección
-            // y que el frontend esté configurado para leer 'token' y 'cliente' de la URL.
             res.redirect(`http://localhost:3000/dashboard?token=${token}&cliente=${encodeURIComponent(JSON.stringify(clienteParaFrontend))}`);
 
         } catch (err) {
-            console.error('Error en Google callback al procesar cliente:', err);
+            console.error('Error en Google callback al procesar cliente:', err); // Mantener
             res.redirect('http://localhost:3000/login?error=server_error');
         }
     }
 );
 
-
-module.exports = router; // Exportamos el router para usarlo en server.js
+module.exports = router;

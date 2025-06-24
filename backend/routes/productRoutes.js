@@ -1,8 +1,9 @@
+// backend/routes/productRoutes.js
 const express = require('express');
 const router = express.Router();
 const { Pool } = require('pg');
-const { protect } = require('../middleware/authMiddleware'); // Para proteger rutas
-// const { authorize } = require('../middleware/authMiddleware'); // Si tuvieras roles para admins
+// Importa ambos middlewares: protect y authorizeRoles
+const { protect, authorizeRoles } = require('../middleware/authMiddleware'); 
 
 // Configuración de la base de datos
 const pool = new Pool({
@@ -47,11 +48,9 @@ router.get('/:id', async (req, res) => {
 
 // @route   POST /api/products
 // @desc    Añadir un nuevo producto (solo admins)
-// @access  Private (requiere token), Admin (opcional, si implementas roles)
-router.post('/', protect, async (req, res) => {
-    // Opcional: Si quieres que solo los administradores puedan añadir productos,
-    // necesitarías una función 'authorize' en tu authMiddleware que verifique 'req.user.es_admin'
-    // router.post('/', protect, authorize(['admin']), async (req, res) => {
+// @access  Private (requiere token), Admin (AHORA SÍ se implementa)
+// MODIFICACIÓN: Añade authorizeRoles('admin') para restringir a admins
+router.post('/', protect, authorizeRoles('admin'), async (req, res) => {
     const { nombre, descripcion, precio, stock, unidad_de_medida, imagen_url, categoria, disponible } = req.body;
 
     // Validación básica
@@ -81,7 +80,8 @@ router.post('/', protect, async (req, res) => {
 // @route   PUT /api/products/:id
 // @desc    Actualizar un producto existente (solo admins)
 // @access  Private, Admin
-router.put('/:id', protect, async (req, res) => {
+// MODIFICACIÓN: Añade authorizeRoles('admin') para restringir a admins
+router.put('/:id', protect, authorizeRoles('admin'), async (req, res) => {
     const { id } = req.params;
     const { nombre, descripcion, precio, stock, unidad_de_medida, imagen_url, categoria, disponible } = req.body;
 
@@ -129,7 +129,8 @@ router.put('/:id', protect, async (req, res) => {
 // @route   DELETE /api/products/:id
 // @desc    Eliminar un producto (solo admins)
 // @access  Private, Admin
-router.delete('/:id', protect, async (req, res) => {
+// MODIFICACIÓN: Añade authorizeRoles('admin') para restringir a admins
+router.delete('/:id', protect, authorizeRoles('admin'), async (req, res) => {
     const { id } = req.params;
     try {
         const result = await pool.query('DELETE FROM productos WHERE id = $1 RETURNING *', [id]);
