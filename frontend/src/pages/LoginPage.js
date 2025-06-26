@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Form, Button, Container, Row, Col, Alert } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
-import { Link } from 'react-router-dom';
-
+import { Link, useNavigate } from 'react-router-dom'; // Importa useNavigate para la redirección
+import api from '../api/axios'; // <<<<< IMPORTANTE: Importa la instancia de Axios
 
 const LoginPage = () => {
   const { login } = useAuth();
+  const navigate = useNavigate(); // Hook para la navegación programática
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,48 +20,51 @@ const LoginPage = () => {
     setLoading(true); // Indica que la operación de login está en curso
 
     try {
-      // --- Validaciones básicas (puedes añadir más) ---
+      // --- Validaciones básicas ---
       if (!email || !password) {
         setError('Por favor, ingresa tu email y contraseña.');
         setLoading(false);
         return;
       }
 
-      // --- CAMBIO CLAVE AQUÍ: Llamada REAL a tu API de autenticación ---
-      const response = await fetch('http://localhost:5000/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
+      // --- CAMBIO CLAVE AQUÍ: Usa la instancia de Axios 'api' ---
+      const response = await api.post('/auth/login', { email, password }); // Usa 'api' en lugar de 'fetch'
+      
+      // Axios automáticamente lanza un error para respuestas 4xx/5xx,
+      // así que no necesitamos el if (!response.ok)
+      
+      const { token, cliente } = response.data; // Axios pone la respuesta en .data
 
-      if (!response.ok) {
-        // Si la respuesta no es 2xx OK, hay un error
-        const errorData = await response.json(); // Tu backend debería enviar un JSON con el error
-        throw new Error(errorData.error || 'Credenciales incorrectas o error de servidor.');
-      }
+      console.log("Login exitoso. Token y datos del cliente recibidos:", response.data);
 
-      // Si la respuesta es exitosa, parsea el JSON
-      const data = await response.json();
-      console.log("Respuesta del backend (Login tradicional):", data);
+      // 1. Almacenar el token en localStorage
+      localStorage.setItem('token', token);
+
+      // 2. Almacenar los datos del cliente (opcional, pero útil)
+      localStorage.setItem('user', JSON.stringify(cliente)); 
 
       // Llama a la función login del AuthContext con el token y los datos de usuario REALES
-      login(data.token, data.cliente); // Asegúrate de que tu backend envía 'token' y 'cliente'
+      login(token, cliente); // Pasa el token y cliente directamente
+
+      // Redirige al usuario al dashboard después del login exitoso
+      navigate('/dashboard'); 
 
     } catch (err) {
-      // Manejo de errores de la API o de la red
-      console.error("Error durante el login:", err.message);
-      setError(err.message || 'Ocurrió un error al intentar iniciar sesión. Por favor, inténtalo más tarde.');
+      // Manejo de errores de Axios (error.response?.data contiene la respuesta del backend)
+      console.error("Error durante el login:", err.response?.data?.error || err.message);
+      setError(err.response?.data?.error || 'Ocurrió un error al intentar iniciar sesión. Por favor, inténtalo más tarde.');
     } finally {
       setLoading(false); // Siempre resetea el estado de carga
     }
   };
 
   // --- El resto del código del componente LoginPage, incluyendo googleLogin, no cambia ---
-  // ... (Tu código para googleLogin y el return JSX) ...
 
   const handleGoogleLoginRedirect = () => {
+    // Para Google Login, la redirección sigue siendo directa al backend
+    // y el backend se encargará de redirigir con token y datos si tiene éxito.
+    // Asegúrate de que el backend envía el token y cliente en la URL de redirección
+    // y que tu AuthContext maneja esos parámetros de la URL al cargar.
     window.location.href = 'http://localhost:5000/api/auth/google';
   };
 
