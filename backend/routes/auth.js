@@ -1,4 +1,4 @@
-// backend/routes/auth.js
+// backend/routes/auth.js (REVISADO)
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
@@ -18,8 +18,6 @@ const pool = new Pool({
 });
 
 // CLAVE SECRETA PARA FIRMAR LOS TOKENS JWT
-// Esto DEBE ser process.env.JWT_SECRET. El fallback 'supersecretkey_fallback'
-// solo es una medida de seguridad en caso de que .env no cargue (raro).
 const JWT_SECRET_GLOBAL = process.env.JWT_SECRET || 'supersecretkey_fallback'; 
 
 // --- Ruta de Registro de Usuario ---
@@ -50,8 +48,6 @@ router.post('/register', async (req, res) => {
             [cliente.id, true, true, true]
         );
 
-        // QUITAR ESTA LÍNEA DE DEPURACIÓN (o comentarla)
-        // console.log('JWT_SECRET usado para FIRMAR (auth.js - register):', JWT_SECRET_GLOBAL); 
         const token = jwt.sign(
             { id: cliente.id, email: cliente.email, role: cliente.role },
             JWT_SECRET_GLOBAL,
@@ -61,7 +57,11 @@ router.post('/register', async (req, res) => {
         res.status(201).json({
             message: 'Usuario registrado exitosamente',
             token,
-            cliente: {
+            // Aquí en el login tradicional y registro, seguimos enviando 'cliente' en el JSON.
+            // Esto es un JSON de respuesta, no un parámetro de URL, por lo que es menos crítico.
+            // Para consistencia total, podrías cambiar este 'cliente' a 'user' también,
+            // y luego actualizar LoginPage.js para esperar 'user'. Por ahora, lo dejamos así.
+            cliente: { 
                 id: cliente.id,
                 nombre: cliente.nombre,
                 email: cliente.email,
@@ -80,33 +80,28 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
-    console.log('Intento de login para email:', email); // Mantener esto, es útil para el log de actividad
-    // console.log('Contraseña recibida (frontend):', password); // NO HACER ESTO EN PRODUCCIÓN
-
+    console.log('Intento de login para email:', email);
     try {
         const clientQuery = 'SELECT id, nombre, email, puntos_actuales, password_hash, role FROM clientes WHERE email = $1';
         const result = await pool.query(clientQuery, [email]);
         const cliente = result.rows[0];
 
         if (!cliente) {
-            console.log('Cliente no encontrado para el email:', email); // Mantener
+            console.log('Cliente no encontrado para el email:', email);
             return res.status(400).json({ error: 'Credenciales inválidas.' });
         }
 
-        console.log('Cliente encontrado en BD:', cliente.email); // Mantener
-        // console.log('Hash de contraseña almacenado (BD):', cliente.password_hash); // Para depuración
+        console.log('Cliente encontrado en BD:', cliente.email);
 
         const isMatch = await bcrypt.compare(password, cliente.password_hash);
 
-        console.log('Resultado de bcrypt.compare:', isMatch); // Mantener
+        console.log('Resultado de bcrypt.compare:', isMatch);
 
         if (!isMatch) {
-            console.log('Contraseña NO coincide para el email:', email); // Mantener
+            console.log('Contraseña NO coincide para el email:', email);
             return res.status(400).json({ error: 'Credenciales inválidas.' });
         }
 
-        // QUITAR ESTA LÍNEA DE DEPURACIÓN (o comentarla)
-        // console.log('JWT_SECRET usado para FIRMAR (auth.js - login):', JWT_SECRET_GLOBAL); 
         const token = jwt.sign(
             { id: cliente.id, email: cliente.email, role: cliente.role },
             JWT_SECRET_GLOBAL,
@@ -116,7 +111,8 @@ router.post('/login', async (req, res) => {
         res.json({
             message: 'Inicio de sesión exitoso',
             token,
-            cliente: {
+            // Aquí también mantenemos 'cliente' en el JSON de respuesta.
+            cliente: { 
                 id: cliente.id,
                 nombre: cliente.nombre,
                 email: cliente.email,
@@ -126,7 +122,7 @@ router.post('/login', async (req, res) => {
         });
 
     } catch (err) {
-        console.error('Error durante el login:', err); // Mantener este error
+        console.error('Error durante el login:', err);
         res.status(500).json({ error: 'Error del servidor al intentar iniciar sesión.' });
     }
 });
@@ -151,27 +147,25 @@ router.get('/google', passport.authenticate('google', { scope: ['profile', 'emai
 router.get('/google/callback',
     passport.authenticate('google', { failureRedirect: '/login-failure' }),
     async (req, res) => {
-        console.log('--- BACKEND: Ruta /google/callback HA SIDO ALCANZADA ---'); // Mantener
+        console.log('--- BACKEND: Ruta /google/callback HA SIDO ALCANZADA ---');
 
         try {
             const cliente = req.user;
 
             if (!cliente) {
-                console.error('Error: Cliente no disponible en req.user después de autenticación Google.'); // Mantener
+                console.error('Error: Cliente no disponible en req.user después de autenticación Google.');
                 return res.redirect('http://localhost:3000/login?error=auth_failed');
             }
 
-            console.log('Cliente obtenido de Passport.js (Google):', cliente); // Mantener
+            console.log('Cliente obtenido de Passport.js (Google):', cliente);
             
-            // QUITAR ESTA LÍNEA DE DEPURACIÓN (o comentarla)
-            // console.log('JWT_SECRET usado para FIRMAR (auth.js - google callback):', JWT_SECRET_GLOBAL); 
             const token = jwt.sign(
                 { id: cliente.id, email: cliente.email, role: cliente.role },
                 JWT_SECRET_GLOBAL,
                 { expiresIn: '1h' }
             );
 
-            console.log('Token JWT generado para Google login.'); // Mantener
+            console.log('Token JWT generado para Google login.');
 
             const clienteParaFrontend = {
                 id: cliente.id,
@@ -182,12 +176,17 @@ router.get('/google/callback',
                 role: cliente.role, 
             };
 
-            console.log('Datos de cliente a enviar al frontend para Google login:', clienteParaFrontend); // Mantener
+            console.log('Datos de cliente a enviar al frontend para Google login:', clienteParaFrontend);
 
-            res.redirect(`http://localhost:3000/dashboard?token=${token}&cliente=${encodeURIComponent(JSON.stringify(clienteParaFrontend))}`);
+            // <<<<<<<<<<<< CAMBIO CLAVE AQUÍ: 'cliente' A 'user' >>>>>>>>>>>>
+            res.redirect(`http://localhost:3000/auth/google/callback?token=${token}&user=${encodeURIComponent(JSON.stringify(clienteParaFrontend))}`);
+            // NOTA: Cambié de '/dashboard' a '/auth/google/callback' porque es la ruta que tu frontend espera para procesar.
+            // Si quieres que vaya directamente al dashboard desde el backend, deberías cambiar la lógica en AuthContext.js
+            // para que no espere en /auth/google/callback sino en el useEffect del AuthProvider en cualquier ruta.
+            // Pero mantener el callback es más robusto para procesar los parámetros.
 
         } catch (err) {
-            console.error('Error en Google callback al procesar cliente:', err); // Mantener
+            console.error('Error en Google callback al procesar cliente:', err);
             res.redirect('http://localhost:3000/login?error=server_error');
         }
     }

@@ -1,116 +1,113 @@
-// frontend/src/context/AuthContext.js
-
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loadingAuth, setLoadingAuth] = useState(true);
+  // Inicialización de estado: Lee de localStorage al inicio.
+  const [user, setUser] = useState(() => {
+    try {
+      const storedUser = localStorage.getItem('user');
+      return storedUser ? JSON.parse(storedUser) : null;
+    } catch (error) {
+      console.error("Error parsing user from localStorage:", error);
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      return null;
+    }
+  });
 
-  const navigate = useNavigate();
-  const location = useLocation();
+  const [token, setToken] = useState(() => {
+    return localStorage.getItem('token') || null;
+  });
 
-  // useEffect para cargar el token y usuario del localStorage al inicio
-  useEffect(() => {
-    console.log('--- useEffect de AuthProvider para localStorage iniciado ---');
-    const storedToken = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
+  const [isAuthenticated, setIsAuthenticated] = useState(!!(token && user));
+  const [loadingAuth, setLoadingAuth] = useState(false); 
 
-    if (storedToken && storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        setToken(storedToken);
-        setUser(parsedUser);
-        setIsAuthenticated(true);
-        console.log('✅ Sesión restaurada desde localStorage.');
-      } catch (e) {
-        console.error("Error al parsear usuario desde localStorage:", e);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-      }
-    }
-    setLoadingAuth(false);
-    console.log('--- useEffect de AuthProvider para localStorage finalizado ---');
-  }, []); // Se ejecuta solo una vez al montar
+  const navigate = useNavigate();
+  const location = useLocation();
 
+  const login = useCallback((newToken, userData) => {
+    console.log('AuthContext.js: login() iniciado.');
+    localStorage.setItem('token', newToken);
+    localStorage.setItem('user', JSON.stringify(userData));
+    setToken(newToken);
+    setUser(userData);
+    setIsAuthenticated(true);
+    console.log('AuthContext.js: Login exitoso. Estados actualizados.');
+  }, []);
 
-    // NUEVO useEffect para manejar la redirección de Google OAuth
-    useEffect(() => {
-        console.log('--- useEffect de AuthProvider para URL parameters iniciado ---');
-        const queryParams = new URLSearchParams(location.search);
-        const urlToken = queryParams.get('token');
-        const urlCliente = queryParams.get('cliente');
+  const logout = useCallback(() => {
+    console.log('AuthContext.js: logout() iniciado.');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setToken(null);
+    setUser(null);
+    setIsAuthenticated(false);
+    console.log('AuthContext.js: Sesión cerrada y localStorage limpiado.');
+    navigate('/login');
+  }, [navigate]);
 
-        if (urlToken && urlCliente) {
-            console.log('Detectados parámetros de token y cliente en la URL.');
-            try {
-                const parsedCliente = JSON.parse(decodeURIComponent(urlCliente));
-                
-                // Usamos la función login que ya actualiza los estados y localStorage
-                login(urlToken, parsedCliente); // Usa tu función login aquí
-                
-                console.log('✅ Sesión iniciada desde URL de Google OAuth.');
-                console.log('Datos del cliente desde URL:', parsedCliente);
+  // useEffect para manejar la redirección de Google OAuth (o cualquier login basado en URL)
+  useEffect(() => {
+    console.log('AuthContext.js: useEffect (URL parameters) iniciado.');
+    const queryParams = new URLSearchParams(location.search);
+    const urlToken = queryParams.get('token');
+    const urlUser = queryParams.get('user');
 
-                // Importante: Limpiar la URL para que el token y cliente no queden expuestos
-                // y para evitar re-procesamiento al recargar.
-                navigate('/dashboard', { replace: true }); // Redirige a /dashboard y reemplaza la entrada en el historial
-            } catch (e) {
-                console.error('Error al procesar parámetros de URL de Google OAuth:', e);
-                logout(); // Si hay error al procesar, cerrar sesión
-            }
-        } else {
-            console.log('No hay parámetros de token y cliente en la URL.');
-        }
-        console.log('--- useEffect de AuthProvider para URL parameters finalizado ---');
-    }, [location.search, navigate]); // Dependencias: re-ejecutar cuando cambie la URL o navigate (raro)
+    if (isAuthenticated && (urlToken || urlUser)) {
+      console.log('AuthContext.js: Ya autenticado y detectados parámetros de URL. Limpiando URL.');
+      navigate(location.pathname, { replace: true });
+      return;
+    }
 
+    if (urlToken && urlUser) {
+      console.log('AuthContext.js: Detectados parámetros de token y user en la URL (Google OAuth).');
+      try {
+        const parsedUser = JSON.parse(decodeURIComponent(urlUser));
+        
+        login(urlToken, parsedUser); 
+        
+        console.log('AuthContext.js: Sesión iniciada desde URL de Google OAuth.');
 
-  // Función de login (para login normal y Google OAuth)
-  const login = (newToken, userData) => {
-    console.log('--- Función login del AuthContext iniciada ---');
-    localStorage.setItem('token', newToken);
-    localStorage.setItem('user', JSON.stringify(userData)); // Guardar el objeto user
-    setToken(newToken);
-    setUser(userData);
-    setIsAuthenticated(true);
-    console.log('✅ Todos los estados de login actualizados. Preparando redirección...');
-    console.log('--- Función login del AuthContext finalizada ---');
-  };
+        navigate('/dashboard', { replace: true }); 
+      } catch (e) {
+        console.error('AuthContext.js: Error al procesar parámetros de URL de Google OAuth:', e);
+        logout();
+        navigate('/login?message=google_parse_error', { replace: true });
+      }
+    } else {
+      console.log('AuthContext.js: No hay parámetros de token y user relevantes en la URL.');
+    }
+    setLoadingAuth(false);
+    console.log('AuthContext.js: useEffect (URL parameters) finalizado.');
+  }, [location.search, navigate, login, logout, isAuthenticated, location.pathname]); // <<<<< CORRECCIÓN AQUÍ: Agregado location.pathname
 
-  // Función de logout
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setToken(null);
-    setUser(null);
-    setIsAuthenticated(false);
-    console.log('❌ Sesión cerrada y token/usuario eliminados.');
-    navigate('/login'); // Redirige al login al cerrar sesión
-  };
+  // useEffect para redirigir si el usuario ya está autenticado y trata de ir a /login o /register
+  useEffect(() => {
+    if (isAuthenticated && (location.pathname === '/login' || location.pathname === '/register')) {
+      console.log(`AuthContext.js: Usuario autenticado, redirigiendo desde ${location.pathname} a /dashboard.`);
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, location.pathname, navigate]); 
 
-  // Si isAuthenticated es true, y el usuario está en /login, redirigir a /dashboard
-  useEffect(() => {
-    if (isAuthenticated && location.pathname === '/login') {
-      navigate('/dashboard', { replace: true });
-    }
-  }, [isAuthenticated, location.pathname, navigate]);
+  if (loadingAuth) {
+    return <div>Cargando sesión...</div>;
+  }
 
-  return (
-    <AuthContext.Provider value={{ user, token, isAuthenticated, login, logout, loadingAuth }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const isAdmin = user && user.role === 'admin';
+
+  return (
+    <AuthContext.Provider value={{ user, token, isAuthenticated, isAdmin, login, logout, loadingAuth }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 };
