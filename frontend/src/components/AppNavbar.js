@@ -1,19 +1,23 @@
 import React from 'react';
 import { Navbar, Nav, Container, Button } from 'react-bootstrap';
 import { LinkContainer } from 'react-router-bootstrap';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom'; // Mantener Link para botones fuera de LinkContainer
+import { useAuth } from '../context/AuthContext'; // <<<<<<< IMPORTANTE: Importa useAuth
 
 
 const AppNavbar = () => {
-  // *** Asegúrate de tener esta línea ***
-  const isAuthenticated = true; // Temporalmente en true para desarrollo
+  // <<<<<<<<< CAMBIO CLAVE AQUÍ: Obtén los valores del AuthContext >>>>>>>>>>
+  const { isAuthenticated, logout, user } = useAuth(); 
+  // No necesitamos useNavigate directamente en AppNavbar para el logout,
+  // ya que la función logout del contexto ya maneja la navegación.
 
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    console.log('Cerrando sesión...');
-    navigate('/login');
-    window.location.reload();
+  // La función handleLogout ya no es necesaria aquí si solo se encarga de llamar a logout del contexto
+  // Sin embargo, si quieres mantenerla para logs o lógica adicional:
+  const handleNavbarLogout = () => {
+    console.log('Cerrando sesión desde Navbar...');
+    logout(); // Llama a la función logout del AuthContext
+    // No necesitas navigate('/login') o window.location.reload() aquí,
+    // ya que 'logout()' del contexto ya maneja la redirección y la limpieza.
   };
 
   return (
@@ -26,26 +30,27 @@ const AppNavbar = () => {
         <Navbar.Toggle aria-controls="basic-navbar-nav" />
         <Navbar.Collapse id="basic-navbar-nav">
           <Nav className="me-auto">
-            {/* Aquí es donde necesitamos isAuthenticated */}
+            {/* Estos enlaces se mostrarán si el usuario está autenticado */}
             {isAuthenticated && (
               <>
-                {/* Ahora podemos reintroducir estos enlaces */}
                 <LinkContainer to="/products">
                   <Nav.Link>Productos</Nav.Link>
                 </LinkContainer>
                 <LinkContainer to="/dashboard">
                   <Nav.Link>Mi Perfil</Nav.Link>
                 </LinkContainer>
+                {/* Opcional: Enlace para añadir productos solo si es admin */}
+                {isAuthenticated && user && user.role === 'admin' && (
+                  <LinkContainer to="/products/add">
+                    <Nav.Link>Añadir Producto</Nav.Link>
+                  </LinkContainer>
+                )}
               </>
             )}
           </Nav>
           <Nav>
-            {/* Y aquí reintroduciremos la lógica de los botones usando Link */}
-            {isAuthenticated ? (
-              <Button variant="outline-light" onClick={handleLogout}>
-                Cerrar Sesión
-              </Button>
-            ) : (
+            {/* Lógica para mostrar Iniciar Sesión/Registrarse o Cerrar Sesión */}
+            {!isAuthenticated ? (
               <>
                 <Link to="/login" style={{ textDecoration: 'none' }}>
                   <Button variant="outline-light" className="me-2">Iniciar Sesión</Button>
@@ -53,6 +58,14 @@ const AppNavbar = () => {
                 <Link to="/register" style={{ textDecoration: 'none' }}>
                   <Button variant="light">Registrarse</Button>
                 </Link>
+              </>
+            ) : (
+              // Si el usuario está autenticado, muestra el nombre y el botón de cerrar sesión
+              <>
+                {user && <Nav.Link className="text-light me-2">Hola, {user.nombre}!</Nav.Link>} {/* Muestra el nombre del usuario */}
+                <Button variant="outline-light" onClick={handleNavbarLogout}> {/* Llama a la nueva función de logout */}
+                  Cerrar Sesión
+                </Button>
               </>
             )}
           </Nav>
