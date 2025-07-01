@@ -6,7 +6,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import AppNavbar from './components/AppNavbar';
 
 import { AuthProvider } from './context/AuthContext';
-import PrivateRoute from './routes/PrivateRoute'; // <<--- ¡Mantén esta importación!
+import PrivateRoute from './routes/PrivateRoute'; 
 
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
@@ -14,10 +14,10 @@ import DashboardPage from './pages/DashboardPage';
 import ProductAddPage from './pages/ProductAddPage';
 import ProductListPage from './pages/ProductListPage';
 import RegisterPage from './pages/RegisterPage';
-// import AuthSuccessHandler from './components/AuthSuccessHandler'; // <<< NO NECESITAS ESTE COMPONENTE YA, LO REEMPLAZAREMOS CON EL NUEVO GoogleAuthCallback
-
-// <<<<<<<< IMPORTANTE: Importa el componente que creamos para el callback de Google
 import GoogleAuthCallback from './pages/GoogleAuthCallback'; 
+
+// <<<<<<<< NUEVA IMPORTACIÓN PARA EDITAR PRODUCTOS >>>>>>>>>>
+import ProductEditPage from './pages/ProductEditPage'; 
 
 function App() {
   return (
@@ -31,32 +31,34 @@ function App() {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               
-              {/* <<<<<<<<<<<< ESTA ES LA RUTA PARA EL CALLBACK DE GOOGLE OAUTH >>>>>>>>>>>>> */}
-              {/* Es crucial que este 'path' coincida EXACTAMENTE con la URL a la que tu backend
-                  redirige después de una autenticación exitosa con Google. */}
               <Route path="/auth/google/callback" element={<GoogleAuthCallback />} />
               
-              {/* Ruta de Productos: Generalmente se deja pública para mostrar el catálogo.
-                  Si quieres que solo los logueados vean productos, envuélvela con PrivateRoute. */}
               <Route path="/products" element={<ProductListPage />} />
 
               {/* RUTAS PROTEGIDAS */}
-              {/* Para Dashboard: Solo accesible si el usuario está autenticado */}
               <Route
                 path="/dashboard"
                 element={
-                  <PrivateRoute> {/* <--- Envuelve DashboardPage con PrivateRoute */}
+                  <PrivateRoute>
                     <DashboardPage />
                   </PrivateRoute>
                 }
               />
-              {/* Para añadir productos: Solo accesible si el usuario está autenticado
-                  (y en el backend también verás por roles si es admin) */}
               <Route
                 path="/products/add"
                 element={
-                  <PrivateRoute> {/* <--- Envuelve ProductAddPage con PrivateRoute */}
+                  <PrivateRoute>
                     <ProductAddPage />
+                  </PrivateRoute>
+                }
+              />
+              {/* <<<<<<<<<<<< NUEVA RUTA PROTEGIDA PARA EDITAR PRODUCTOS >>>>>>>>>>>>> */}
+              {/* El :id en la ruta significa que es un parámetro dinámico que se capturará. */}
+              <Route
+                path="/products/edit/:id" 
+                element={
+                  <PrivateRoute>
+                    <ProductEditPage />
                   </PrivateRoute>
                 }
               />

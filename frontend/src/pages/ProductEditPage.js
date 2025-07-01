@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom'; // useParams para obtener el ID de la URL
 import { useAuth } from '../context/AuthContext';
-import { Container, Form, Button, Alert, Spinner } from 'react-bootstrap'; // Importar componentes de Bootstrap
+import { Container, Form, Button, Alert, Spinner } from 'react-bootstrap';
 import axios from '../api/axios'; // Importar la instancia de Axios configurada
 
-const ProductAddPage = () => {
+const ProductEditPage = () => {
+    const { id } = useParams(); // Obtiene el ID del producto de la URL
     const navigate = useNavigate();
     const { user, isAuthenticated, loadingAuth } = useAuth(); 
 
@@ -18,18 +19,19 @@ const ProductAddPage = () => {
         categoria: '',
         disponible: true,
     });
+    const [loadingProduct, setLoadingProduct] = useState(true); // Nuevo estado para cargar el producto
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false); // Estado para el botón de envío
 
-    // useEffect para verificar el rol y redirigir
+    // useEffect para verificar el rol y redirigir, y para cargar el producto
     useEffect(() => {
-        // No redirigir si loadingAuth es true (AuthContext aún está inicializando)
+        // No redirigir ni cargar si loadingAuth es true
         if (loadingAuth) {
             return; 
         }
 
-        // Si el usuario NO está autenticado (aunque PrivateRoute ya debería manejar esto)
+        // Si el usuario NO está autenticado
         if (!isAuthenticated) {
             navigate('/login', { replace: true });
             return;
@@ -38,8 +40,35 @@ const ProductAddPage = () => {
         // Si el usuario está autenticado, pero NO tiene el rol de 'admin'
         if (user && user.role !== 'admin') {
             navigate('/dashboard', { replace: true });
+            return; // Detener la ejecución del efecto
         }
-    }, [user, navigate, isAuthenticated, loadingAuth]);
+
+        // Si es admin y autenticado, intentar cargar el producto
+        const fetchProduct = async () => {
+            try {
+                const response = await axios.get(`/products/${id}`); // Petición GET al backend por ID
+                const productData = response.data; // Axios pone la data directamente en .data
+                setFormData({
+                    nombre: productData.nombre || '',
+                    descripcion: productData.descripcion || '',
+                    // Asegúrate de que precio y stock sean números para los inputs
+                    precio: productData.precio !== undefined ? String(productData.precio) : '',
+                    stock: productData.stock !== undefined ? String(productData.stock) : '',
+                    unidad_de_medida: productData.unidad_de_medida || 'kg',
+                    imagen_url: productData.imagen_url || '',
+                    categoria: productData.categoria || '',
+                    disponible: productData.disponible !== undefined ? productData.disponible : true,
+                });
+            } catch (err) {
+                console.error('Error al cargar el producto para edición:', err);
+                setError('No se pudo cargar el producto para edición. Verifica el ID.');
+            } finally {
+                setLoadingProduct(false); // La carga del producto ha terminado
+            }
+        };
+
+        fetchProduct();
+    }, [id, user, navigate, isAuthenticated, loadingAuth]); // Dependencias: id, user, navigate, isAuthenticated, loadingAuth
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -53,9 +82,9 @@ const ProductAddPage = () => {
         e.preventDefault();
         setMessage('');
         setError('');
-        setIsSubmitting(true); // Desactivar el botón al enviar
+        setIsSubmitting(true);
 
-        // Validaciones Frontend
+        // Validaciones Frontend (similares a ProductAddPage)
         if (!formData.nombre || !formData.precio || !formData.stock) {
             setError('Nombre, Precio y Stock son obligatorios.');
             setIsSubmitting(false);
@@ -73,79 +102,68 @@ const ProductAddPage = () => {
         }
 
         try {
-            // No necesitas obtener el token manualmente aquí si estás usando la instancia de axios
-            // que ya tiene el interceptor para añadir el token.
-            // Si tu axios no tiene interceptor, descomenta esto:
-            // const token = localStorage.getItem('token');
-            // if (!token) {
-            //     setError('No estás autenticado. Por favor, inicia sesión.');
-            //     navigate('/login');
-            //     return;
-            // }
-
-            const productData = {
+            const productDataToUpdate = {
                 ...formData,
                 precio: parseFloat(formData.precio),
                 stock: parseInt(formData.stock),
             };
 
-            const response = await axios.post('/products', productData); // Usamos axios
-            
-            if (response.status === 201) { // 201 Created es el código esperado para un POST exitoso
-                setMessage('Producto añadido exitosamente!');
-                setFormData({ // Limpiar el formulario
-                    nombre: '',
-                    descripcion: '',
-                    precio: '',
-                    stock: '',
-                    unidad_de_medida: 'kg',
-                    imagen_url: '',
-                    categoria: '',
-                    disponible: true,
-                });
-                // Pequeño retardo para que el usuario vea el mensaje de éxito antes de redirigir
+            const response = await axios.put(`/products/${id}`, productDataToUpdate); // Petición PUT al backend
+
+            if (response.status === 200) { // 200 OK es el código esperado para un PUT exitoso
+                setMessage('Producto actualizado exitosamente!');
+                // No limpiamos el formulario, ya que estamos editando un producto existente.
+                // Redirigir al usuario a la lista de productos después de un breve retardo.
                 setTimeout(() => {
                     navigate('/products');
                 }, 1500); 
             } else {
-                // Axios ya maneja los errores 4xx/5xx como errores y los captura en el catch
-                // Esta parte solo se ejecutaría si response.status fuera 2xx pero no 201
-                setError(response.data.error || 'Error desconocido al añadir el producto.');
+                setError(response.data.error || 'Error desconocido al actualizar el producto.');
             }
         } catch (err) {
-            console.error('Error al añadir producto:', err);
-            // El interceptor de Axios ya maneja el 401/403. Aquí manejamos otros errores de la API.
+            console.error('Error al actualizar producto:', err);
             if (err.response) {
-                // Errores de respuesta de la API (ej. 400 Bad Request, si el backend falla una validación)
-                setError(err.response.data.error || 'Error al añadir el producto (respuesta del servidor).');
+                setError(err.response.data.error || 'Error al actualizar el producto (respuesta del servidor).');
             } else if (err.request) {
-                // La petición fue hecha pero no hubo respuesta (ej. servidor caído)
                 setError('No se pudo conectar con el servidor. Intenta de nuevo más tarde.');
             } else {
-                // Otros errores (ej. configuración de Axios)
                 setError('Ocurrió un error inesperado al procesar la solicitud.');
             }
         } finally {
-            setIsSubmitting(false); // Volver a habilitar el botón
+            setIsSubmitting(false);
         }
     };
 
-    // Esto es para evitar renderizar el formulario si el usuario no es admin o si aún se está cargando la autenticación
-    if (loadingAuth || !isAuthenticated || (user && user.role !== 'admin')) {
+    // Renderizado condicional para estados de carga y acceso
+    if (loadingAuth || loadingProduct || !isAuthenticated || (user && user.role !== 'admin')) {
+        let content;
+        if (loadingAuth || loadingProduct) {
+            content = (
+                <>
+                    <Spinner animation="border" className="mt-3" />
+                    <p className="mt-2">Cargando información del producto y usuario...</p>
+                </>
+            );
+        } else {
+            content = (
+                <>
+                    <h2 className="mb-3">Acceso Denegado</h2>
+                    <p className="text-muted">No tienes permiso para acceder a esta página.</p>
+                </>
+            );
+        }
         return (
             <Container className="my-5 text-center">
-                <h2 className="mb-3">Acceso Denegado</h2>
-                <p className="text-muted">No tienes permiso para acceder a esta página.</p>
-                {loadingAuth && <Spinner animation="border" className="mt-3" />}
+                {content}
             </Container>
         );
     }
 
-    // Si todo está bien, renderizar el formulario
+    // Si todo está bien, renderizar el formulario de edición
     return (
         <Container className="my-5 p-4 border rounded shadow-sm" style={{ maxWidth: '700px' }}>
-            <h1 className="mb-4 text-center text-primary">Añadir Nuevo Producto</h1>
-            <p className="text-center text-muted mb-4">Ingresa los detalles para un nuevo producto.</p>
+            <h1 className="mb-4 text-center text-primary">Editar Producto</h1>
+            <p className="text-center text-muted mb-4">Modifica los detalles del producto.</p>
 
             {message && <Alert variant="success" onClose={() => setMessage('')} dismissible>{message}</Alert>}
             {error && <Alert variant="danger" onClose={() => setError('')} dismissible>{error}</Alert>}
@@ -158,7 +176,6 @@ const ProductAddPage = () => {
                         name="nombre"
                         value={formData.nombre}
                         onChange={handleChange}
-                        placeholder="Ej: Lomo de cerdo"
                         required
                     />
                 </Form.Group>
@@ -171,7 +188,6 @@ const ProductAddPage = () => {
                         name="descripcion"
                         value={formData.descripcion}
                         onChange={handleChange}
-                        placeholder="Breve descripción del producto..."
                     />
                 </Form.Group>
 
@@ -183,7 +199,6 @@ const ProductAddPage = () => {
                         value={formData.precio}
                         onChange={handleChange}
                         step="0.01"
-                        placeholder="Ej: 15.75"
                         required
                     />
                 </Form.Group>
@@ -195,7 +210,6 @@ const ProductAddPage = () => {
                         name="stock"
                         value={formData.stock}
                         onChange={handleChange}
-                        placeholder="Ej: 100 (unidades o kg)"
                         required
                     />
                 </Form.Group>
@@ -221,7 +235,6 @@ const ProductAddPage = () => {
                         name="imagen_url"
                         value={formData.imagen_url}
                         onChange={handleChange}
-                        placeholder="Ej: http://ejemplo.com/imagen.jpg"
                     />
                 </Form.Group>
 
@@ -232,7 +245,6 @@ const ProductAddPage = () => {
                         name="categoria"
                         value={formData.categoria}
                         onChange={handleChange}
-                        placeholder="Ej: Carnes Rojas, Pollo, Embutidos"
                     />
                 </Form.Group>
 
@@ -250,10 +262,10 @@ const ProductAddPage = () => {
                     {isSubmitting ? (
                         <>
                             <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
-                            Añadiendo...
+                            Guardando cambios...
                         </>
                     ) : (
-                        'Añadir Producto'
+                        'Guardar Cambios'
                     )}
                 </Button>
             </Form>
@@ -261,4 +273,4 @@ const ProductAddPage = () => {
     );
 };
 
-export default ProductAddPage;
+export default ProductEditPage;
