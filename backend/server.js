@@ -1,4 +1,6 @@
 require('dotenv').config();
+console.log('CLIENT_URL cargado en backend (server.js):', process.env.CLIENT_URL);
+
 const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');

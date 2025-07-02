@@ -1,9 +1,9 @@
+// backend/config/passport.js
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
-const { Pool } = require('pg'); // Necesitamos el cliente de PostgreSQL
-require('dotenv').config(); // Asegúrate de cargar las variables de entorno
+const { Pool } = require('pg'); 
+require('dotenv').config(); 
 
-// Configuración de la base de datos (usando las variables de entorno)
 const pool = new Pool({
     user: process.env.DB_USER,
     host: process.env.DB_HOST,
@@ -12,21 +12,15 @@ const pool = new Pool({
     port: process.env.DB_PORT,
 });
 
-// --- Serialización y Deserialización del Usuario ---
-// Esto es para que Passport sepa cómo guardar (serializar) el usuario en la sesión
-// y cómo recuperar (deserializar) el usuario de la sesión.
-// Aunque no usaremos sesiones tradicionales para la autenticación principal (usaremos JWT),
-// Passport las necesita internamente para el flujo OAuth.
 passport.serializeUser((user, done) => {
-    done(null, user.id); // Solo necesitamos guardar el ID del usuario en la sesión
+    done(null, user.id); 
 });
 
 passport.deserializeUser(async (id, done) => {
     try {
-        // MODIFICACIÓN: Añadir 'role' a la SELECT para que esté disponible en req.user
         const userResult = await pool.query('SELECT id, nombre, email, puntos_actuales, google_id, role FROM clientes WHERE id = $1', [id]);
         if (userResult.rows.length > 0) {
-            done(null, userResult.rows[0]); // El usuario se recuperó correctamente
+            done(null, userResult.rows[0]);
         } else {
             done(new Error('User not found'), null);
         }
@@ -35,33 +29,49 @@ passport.deserializeUser(async (id, done) => {
     }
 });
 
-// --- Estrategia de Google OAuth 2.0 ---
 passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    // Asegúrate de que esta callbackURL coincida EXACTAMENTE con la que configuraste en Google Cloud Console
-    callbackURL: 'http://localhost:5000/api/auth/google/callback' 
+    // <<<<<<<<<<<< CAMBIO CLAVE AQUÍ: DEBE APUNTAR AL BACKEND (PUERTO 5000) >>>>>>>>>>>>
+    callbackURL: `http://localhost:5000/api/auth/google/callback`, 
+    // ^^^ Este es el URI que Google utilizará para redirigir después de una autenticación exitosa.
+    // Debe coincidir exactamente con una de las "URI de redireccionamiento autorizados" en tu Google Cloud Console.
+    passReqToCallback: true 
 },
-async (accessToken, refreshToken, profile, done) => {
+async (request, accessToken, refreshToken, profile, done) => {
     try {
-        // MODIFICACIÓN: Seleccionar 'role' también al buscar usuario existente por google_id
         let user = await pool.query('SELECT id, nombre, email, puntos_actuales, google_id, role FROM clientes WHERE google_id = $1', [profile.id]);
 
-        if (user.rows.length > 0) {
-            // Usuario ya existe, lo retorna (ahora con el campo 'role' incluido)
-            return done(null, user.rows[0]);
-        } else {
-            // El usuario no existe, crea uno nuevo
-            // MODIFICACIÓN: Incluir 'role' en el INSERT y en RETURNING. Por defecto 'user' para nuevos usuarios de Google.
-            const newUser = await pool.query(
-                'INSERT INTO clientes (nombre, email, google_id, role) VALUES ($1, $2, $3, $4) RETURNING id, nombre, email, puntos_actuales, google_id, role',
-                [profile.displayName, profile.emails[0].value, profile.id, 'user'] // Añadir 'user' como rol por defecto
+        if (user.rows.length === 0) {
+            const newUserQuery = `
+                INSERT INTO clientes (nombre, email, google_id, puntos_actuales, es_admin, role) 
+                VALUES ($1, $2, $3, $4, $5, $6) 
+                RETURNING id, nombre, email, puntos_actuales, es_admin, role`;
+            const newUserValues = [
+                profile.displayName,
+                profile.emails[0].value,
+                profile.id,
+                0, 
+                false, 
+                'user' 
+            ];
+            const result = await pool.query(newUserQuery, newUserValues);
+            user = result.rows[0];
+            await pool.query(
+                'INSERT INTO preferencias_notificaciones (cliente_id) VALUES ($1)',
+                [user.id]
             );
-            return done(null, newUser.rows[0]);
+            console.log('Nuevo usuario de Google registrado:', user.email);
+        } else {
+            user = user.rows[0];
+            await pool.query('UPDATE clientes SET fecha_ultima_sesion = NOW() WHERE id = $1', [user.id]);
+            console.log('Usuario de Google existente ha iniciado sesión:', user.email);
         }
+        
+        done(null, user); // Pasamos el usuario a la siguiente etapa de Passport (el callback en auth.js)
+
     } catch (err) {
-        return done(err, null);
+        console.error('Error durante la autenticación de Google:', err);
+        done(err, false);
     }
 }));
-
-// No exportamos nada de aquí, solo se "configura" passport al requerir este archivo en server.js.
