@@ -16,61 +16,64 @@ import ProductListPage from './pages/ProductListPage';
 import RegisterPage from './pages/RegisterPage';
 import GoogleAuthCallback from './pages/GoogleAuthCallback'; 
 
-// <<<<<<<< NUEVA IMPORTACIÓN PARA EDITAR PRODUCTOS >>>>>>>>>>
 import ProductEditPage from './pages/ProductEditPage'; 
+// >>>>>>>>>>>>>>> NUEVA IMPORTACIÓN PARA LA PÁGINA DE CANJE <<<<<<<<<<<<<<<<
+import RedemptionProductsPage from './pages/RedemptionProductsPage'; 
 
 function App() {
-  return (
-    <Router>
-      <AuthProvider>
-        <div className="App">
-          <AppNavbar />
-          <main>
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-              
-              <Route path="/auth/google/callback" element={<GoogleAuthCallback />} />
-              
-              <Route path="/products" element={<ProductListPage />} />
+  return (
+    <Router>
+      <AuthProvider>
+        <div className="App">
+          <AppNavbar />
+          <main>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              
+              <Route path="/auth/google/callback" element={<GoogleAuthCallback />} />
+              
+              {/* Esta ruta ahora muestra solo productos de venta/ofertas */}
+              <Route path="/products" element={<ProductListPage />} />
 
-              {/* RUTAS PROTEGIDAS */}
-              <Route
-                path="/dashboard"
-                element={
-                  <PrivateRoute>
-                    <DashboardPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/products/add"
-                element={
-                  <PrivateRoute>
-                    <ProductAddPage />
-                  </PrivateRoute>
-                }
-              />
-              {/* <<<<<<<<<<<< NUEVA RUTA PROTEGIDA PARA EDITAR PRODUCTOS >>>>>>>>>>>>> */}
-              {/* El :id en la ruta significa que es un parámetro dinámico que se capturará. */}
-              <Route
-                path="/products/edit/:id" 
-                element={
-                  <PrivateRoute>
-                    <ProductEditPage />
-                  </PrivateRoute>
-                }
-              />
-              
-              {/* Puedes añadir una ruta para un 404 Not Found si lo deseas */}
-              {/* <Route path="*" element={<h1>404 - Página no encontrada</h1>} /> */}
-            </Routes>
-          </main>
-        </div>
-      </AuthProvider>
-    </Router>
-  );
+              {/* >>>>>>>>>>>>>>> NUEVA RUTA PARA PRODUCTOS DE CANJE <<<<<<<<<<<<<<<< */}
+              <Route path="/redemption-products" element={<RedemptionProductsPage />} />
+
+              {/* RUTAS PROTEGIDAS */}
+              <Route
+                path="/dashboard"
+                element={
+                  <PrivateRoute>
+                    <DashboardPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/products/add"
+                element={
+                  <PrivateRoute>
+                    <ProductAddPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/products/edit/:id" 
+                element={
+                  <PrivateRoute>
+                    <ProductEditPage />
+                  </PrivateRoute>
+                }
+              />
+              
+              {/* Puedes añadir una ruta para un 404 Not Found si lo deseas */}
+              {/* <Route path="*" element={<h1>404 - Página no encontrada</h1>} /> */}
+            </Routes>
+          </main>
+        </div>
+      </AuthProvider>
+    </Router>
+  );
 }
 
 export default App;

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Container, Form, Button, Alert, Spinner } from 'react-bootstrap'; // Importar componentes de Bootstrap
-import axios from '../api/axios'; // Importar la instancia de Axios configurada
+import { Container, Form, Button, Alert, Spinner } from 'react-bootstrap';
+import axios from '../api/axios';
 
 const ProductAddPage = () => {
     const navigate = useNavigate();
@@ -17,25 +17,23 @@ const ProductAddPage = () => {
         imagen_url: '',
         categoria: '',
         disponible: true,
+        // >>>>>>>>>>>>>>> NUEVO CAMPO: puntos_canje <<<<<<<<<<<<<<<<
+        puntos_canje: '', 
     });
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
-    const [isSubmitting, setIsSubmitting] = useState(false); // Estado para el botón de envío
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // useEffect para verificar el rol y redirigir
     useEffect(() => {
-        // No redirigir si loadingAuth es true (AuthContext aún está inicializando)
         if (loadingAuth) {
             return; 
         }
 
-        // Si el usuario NO está autenticado (aunque PrivateRoute ya debería manejar esto)
         if (!isAuthenticated) {
             navigate('/login', { replace: true });
             return;
         }
 
-        // Si el usuario está autenticado, pero NO tiene el rol de 'admin'
         if (user && user.role !== 'admin') {
             navigate('/dashboard', { replace: true });
         }
@@ -53,47 +51,75 @@ const ProductAddPage = () => {
         e.preventDefault();
         setMessage('');
         setError('');
-        setIsSubmitting(true); // Desactivar el botón al enviar
+        setIsSubmitting(true);
 
-        // Validaciones Frontend
-        if (!formData.nombre || !formData.precio || !formData.stock) {
-            setError('Nombre, Precio y Stock son obligatorios.');
+        // >>>>>>>>>>>>>>> CORRECCIÓN EN VALIDACIONES <<<<<<<<<<<<<<<<
+        // Validar que nombre y stock sean obligatorios (precio ya no se valida aquí)
+        if (!formData.nombre || !formData.stock) {
+            setError('Nombre y Stock son obligatorios.');
             setIsSubmitting(false);
             return;
         }
-        if (isNaN(parseFloat(formData.precio)) || parseFloat(formData.precio) <= 0) {
-            setError('El precio debe ser un número positivo.');
+
+        // Determinar si se ingresó precio o puntos de canje
+        const hasPriceInput = formData.precio !== '' && formData.precio !== null;
+        const hasPointsInput = formData.puntos_canje !== '' && formData.puntos_canje !== null;
+
+        // Validar que se ingrese uno y solo uno de los dos (precio o puntos)
+        if (!hasPriceInput && !hasPointsInput) {
+            setError('Debe ingresar un Precio o Puntos de Canje para el producto.');
             setIsSubmitting(false);
             return;
         }
-        if (isNaN(parseInt(formData.stock)) || parseInt(formData.stock) < 0) {
+        if (hasPriceInput && hasPointsInput) {
+            setError('No puede ingresar Precio y Puntos de Canje a la vez. Elija uno.');
+            setIsSubmitting(false);
+            return;
+        }
+
+        // Validar el precio si fue ingresado
+        if (hasPriceInput) {
+            const parsedPrice = parseFloat(formData.precio);
+            if (isNaN(parsedPrice) || parsedPrice <= 0) {
+                setError('El precio debe ser un número positivo.');
+                setIsSubmitting(false);
+                return;
+            }
+        }
+
+        // Validar los puntos de canje si fueron ingresados
+        if (hasPointsInput) {
+            const parsedPoints = parseInt(formData.puntos_canje);
+            if (isNaN(parsedPoints) || parsedPoints < 0) { // Puntos pueden ser 0
+                setError('Los puntos de canje deben ser un número no negativo.');
+                setIsSubmitting(false);
+                return;
+            }
+        }
+
+        // Validar stock (lo muevo aquí abajo para que se ejecute después de las validaciones de precio/puntos)
+        const parsedStock = parseInt(formData.stock);
+        if (isNaN(parsedStock) || parsedStock < 0) {
             setError('El stock debe ser un número no negativo.');
             setIsSubmitting(false);
             return;
         }
+        // >>>>>>>>>>>>>>> FIN CORRECCIÓN EN VALIDACIONES <<<<<<<<<<<<<<<<
 
         try {
-            // No necesitas obtener el token manualmente aquí si estás usando la instancia de axios
-            // que ya tiene el interceptor para añadir el token.
-            // Si tu axios no tiene interceptor, descomenta esto:
-            // const token = localStorage.getItem('token');
-            // if (!token) {
-            //     setError('No estás autenticado. Por favor, inicia sesión.');
-            //     navigate('/login');
-            //     return;
-            // }
-
             const productData = {
                 ...formData,
-                precio: parseFloat(formData.precio),
-                stock: parseInt(formData.stock),
+                // Asegurarse de enviar null si el campo está vacío o no es aplicable
+                precio: hasPriceInput ? parseFloat(formData.precio) : null,
+                puntos_canje: hasPointsInput ? parseInt(formData.puntos_canje) : null,
+                stock: parsedStock, // Ya validado y parseado
             };
 
-            const response = await axios.post('/products', productData); // Usamos axios
+            const response = await axios.post('/products', productData); 
             
-            if (response.status === 201) { // 201 Created es el código esperado para un POST exitoso
+            if (response.status === 201) {
                 setMessage('Producto añadido exitosamente!');
-                setFormData({ // Limpiar el formulario
+                setFormData({ // Limpiar el formulario y resetear puntos_canje
                     nombre: '',
                     descripcion: '',
                     precio: '',
@@ -102,35 +128,28 @@ const ProductAddPage = () => {
                     imagen_url: '',
                     categoria: '',
                     disponible: true,
+                    puntos_canje: '', // Resetear también
                 });
-                // Pequeño retardo para que el usuario vea el mensaje de éxito antes de redirigir
                 setTimeout(() => {
                     navigate('/products');
                 }, 1500); 
             } else {
-                // Axios ya maneja los errores 4xx/5xx como errores y los captura en el catch
-                // Esta parte solo se ejecutaría si response.status fuera 2xx pero no 201
                 setError(response.data.error || 'Error desconocido al añadir el producto.');
             }
         } catch (err) {
             console.error('Error al añadir producto:', err);
-            // El interceptor de Axios ya maneja el 401/403. Aquí manejamos otros errores de la API.
             if (err.response) {
-                // Errores de respuesta de la API (ej. 400 Bad Request, si el backend falla una validación)
                 setError(err.response.data.error || 'Error al añadir el producto (respuesta del servidor).');
             } else if (err.request) {
-                // La petición fue hecha pero no hubo respuesta (ej. servidor caído)
                 setError('No se pudo conectar con el servidor. Intenta de nuevo más tarde.');
             } else {
-                // Otros errores (ej. configuración de Axios)
                 setError('Ocurrió un error inesperado al procesar la solicitud.');
             }
         } finally {
-            setIsSubmitting(false); // Volver a habilitar el botón
+            setIsSubmitting(false);
         }
     };
 
-    // Esto es para evitar renderizar el formulario si el usuario no es admin o si aún se está cargando la autenticación
     if (loadingAuth || !isAuthenticated || (user && user.role !== 'admin')) {
         return (
             <Container className="my-5 text-center">
@@ -141,11 +160,10 @@ const ProductAddPage = () => {
         );
     }
 
-    // Si todo está bien, renderizar el formulario
     return (
         <Container className="my-5 p-4 border rounded shadow-sm" style={{ maxWidth: '700px' }}>
             <h1 className="mb-4 text-center text-primary">Añadir Nuevo Producto</h1>
-            <p className="text-center text-muted mb-4">Ingresa los detalles para un nuevo producto.</p>
+            <p className="text-center text-muted mb-4">Ingresa los detalles para un nuevo producto. Un producto debe tener Precio O Puntos de Canje, pero no ambos.</p>
 
             {message && <Alert variant="success" onClose={() => setMessage('')} dismissible>{message}</Alert>}
             {error && <Alert variant="danger" onClose={() => setError('')} dismissible>{error}</Alert>}
@@ -176,7 +194,7 @@ const ProductAddPage = () => {
                 </Form.Group>
 
                 <Form.Group className="mb-3" controlId="precio">
-                    <Form.Label>Precio</Form.Label>
+                    <Form.Label>Precio (deja vacío si es por canje)</Form.Label>
                     <Form.Control
                         type="number"
                         name="precio"
@@ -184,9 +202,26 @@ const ProductAddPage = () => {
                         onChange={handleChange}
                         step="0.01"
                         placeholder="Ej: 15.75"
-                        required
+                        // Eliminamos 'required' aquí porque ahora es opcional si hay puntos_canje
                     />
                 </Form.Group>
+
+                {/* >>>>>>>>>>>>>>> NUEVO CAMPO: Puntos de Canje <<<<<<<<<<<<<<<< */}
+                <Form.Group className="mb-3" controlId="puntos_canje">
+                    <Form.Label>Puntos de Canje (deja vacío si es por venta)</Form.Label>
+                    <Form.Control
+                        type="number"
+                        name="puntos_canje"
+                        value={formData.puntos_canje}
+                        onChange={handleChange}
+                        min="0"
+                        placeholder="Ej: 500"
+                    />
+                    <Form.Text className="text-muted">
+                        Si este producto se canjea por puntos, ingresa el valor aquí y deja el precio vacío.
+                    </Form.Text>
+                </Form.Group>
+                {/* >>>>>>>>>>>>>>> FIN NUEVO CAMPO <<<<<<<<<<<<<<<< */}
 
                 <Form.Group className="mb-3" controlId="stock">
                     <Form.Label>Stock</Form.Label>

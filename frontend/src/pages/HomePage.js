@@ -1,10 +1,8 @@
-import React, { useState } from 'react'; // <--- ¡Asegúrate de que solo diga esto!
+import React, { useState } from 'react';
 import { Container, Row, Col, Card, Form, Button, Alert, Spinner } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext'; 
 import axios from '../api/axios'; 
-
-// ... el resto del código ...
 
 const HomePage = () => {
     const { login, isAuthenticated, loadingAuth } = useAuth();
@@ -39,11 +37,28 @@ const HomePage = () => {
         setIsSubmitting(true);
 
         try {
-            await login(formData.email, formData.password);
-            // El propio `login` del AuthContext maneja la redirección al dashboard
+            const response = await axios.post('/login', {
+                email: formData.email,
+                password: formData.password
+            });
+
+            // <<<<<<<<<< CAMBIO CLAVE AQUÍ: PASA EL TOKEN Y EL OBJETO 'CLIENTE' DEL BACKEND >>>>>>>>>>
+            // Tu backend para login tradicional envía el objeto de usuario bajo la clave 'cliente'
+            if (response.data.token && response.data.cliente) {
+                // Pasamos el token y el objeto 'cliente' completo (que incluye el nombre)
+                login(response.data.token, response.data.cliente); 
+            } else {
+                // Esto no debería ocurrir si el backend está bien, pero es una seguridad
+                setError('Respuesta inesperada del servidor.');
+            }
+            
         } catch (err) {
             console.error('Error de inicio de sesión:', err);
-            setError(err.message || 'Error al iniciar sesión. Verifica tus credenciales.');
+            if (err.response) {
+                setError(err.response.data.error || 'Error al iniciar sesión.');
+            } else {
+                setError('No se pudo conectar con el servidor. Intenta de nuevo más tarde.');
+            }
         } finally {
             setIsSubmitting(false);
         }

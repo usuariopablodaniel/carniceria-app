@@ -48,32 +48,78 @@ router.get('/:id', async (req, res) => {
 
 // @route   POST /api/products
 // @desc    Añadir un nuevo producto (solo admins)
-// @access  Private (requiere token), Admin (AHORA SÍ se implementa)
+// @access  Private (requiere token), Admin
 // MODIFICACIÓN: Añade authorizeRoles('admin') para restringir a admins
 router.post('/', protect, authorizeRoles('admin'), async (req, res) => {
-    const { nombre, descripcion, precio, stock, unidad_de_medida, imagen_url, categoria, disponible } = req.body;
+    // >>>>>>>>>>>>>> MODIFICACIONES AQUÍ: Añadir puntos_canje y ajustar desestructuración <<<<<<<<<<<<
+    const { nombre, descripcion, precio, stock, unidad_de_medida, imagen_url, categoria, disponible, puntos_canje } = req.body;
 
-    // Validación básica
-    if (!nombre || !precio || !stock) {
-        return res.status(400).json({ error: 'Nombre, precio y stock son campos obligatorios.' });
+    // Determinar si se ingresó precio o puntos de canje (para backend)
+    const hasPriceInput = (precio !== undefined && precio !== null && precio !== '');
+    const hasPointsInput = (puntos_canje !== undefined && puntos_canje !== null && puntos_canje !== '');
+
+    // >>>>>>>>>>>>>> MODIFICACIONES AQUÍ: Validaciones para precio y puntos_canje <<<<<<<<<<<<
+    // Validar que nombre y stock sean obligatorios
+    if (!nombre || !stock) {
+        return res.status(400).json({ error: 'Nombre y Stock son campos obligatorios.' });
     }
-    if (isNaN(precio) || precio <= 0) {
-        return res.status(400).json({ error: 'El precio debe ser un número positivo.' });
+
+    // Validar que se ingrese uno y solo uno de los dos (precio o puntos)
+    if (!hasPriceInput && !hasPointsInput) {
+        return res.status(400).json({ error: 'Debe ingresar un Precio o Puntos de Canje para el producto.' });
     }
-    if (isNaN(stock) || stock < 0) {
+    if (hasPriceInput && hasPointsInput) {
+        return res.status(400).json({ error: 'No puede ingresar Precio y Puntos de Canje a la vez. Elija uno.' });
+    }
+
+    // Validar el precio si fue ingresado
+    if (hasPriceInput) {
+        if (isNaN(precio) || parseFloat(precio) <= 0) {
+            return res.status(400).json({ error: 'El precio debe ser un número positivo.' });
+        }
+    }
+
+    // Validar los puntos de canje si fueron ingresados
+    if (hasPointsInput) {
+        if (isNaN(puntos_canje) || parseInt(puntos_canje) < 0) { // Puntos pueden ser 0
+            return res.status(400).json({ error: 'Los puntos de canje deben ser un número no negativo.' });
+        }
+    }
+
+    // Validar stock
+    if (isNaN(stock) || parseInt(stock) < 0) {
         return res.status(400).json({ error: 'El stock debe ser un número no negativo.' });
     }
+    // >>>>>>>>>>>>>> FIN MODIFICACIONES EN VALIDACIONES <<<<<<<<<<<<<<<<
 
     try {
+        // >>>>>>>>>>>>>> MODIFICACIONES AQUÍ: Incluir puntos_canje en la consulta SQL <<<<<<<<<<<<
+        // Asegúrate de que tu tabla 'productos' en PostgreSQL tenga una columna 'puntos_canje' (tipo INTEGER o NUMERIC)
+        // Y que la columna 'precio' pueda aceptar NULLs (e.g., FLOAT o NUMERIC)
         const result = await pool.query(
-            `INSERT INTO productos (nombre, descripcion, precio, stock, unidad_de_medida, imagen_url, categoria, disponible)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-            [nombre, descripcion, precio, stock, unidad_de_medida, imagen_url, categoria, disponible]
+            `INSERT INTO productos (nombre, descripcion, precio, stock, unidad_de_medida, imagen_url, categoria, disponible, puntos_canje)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+            [
+                nombre,
+                descripcion,
+                hasPriceInput ? parseFloat(precio) : null, // Enviar precio como null si no está presente
+                parseInt(stock), // Asegurarse de que stock sea un entero
+                unidad_de_medida,
+                imagen_url,
+                categoria,
+                disponible,
+                hasPointsInput ? parseInt(puntos_canje) : null // Enviar puntos_canje como null si no está presente
+            ]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
         console.error('Error al añadir producto:', err.message);
-        res.status(500).json({ error: 'Error interno del servidor al añadir el producto.' });
+        // Puedes agregar una lógica para verificar si el error es por una restricción de la base de datos
+        if (err.code === '23502') { // error de not-null constraint violation en PostgreSQL
+             res.status(400).json({ error: 'Faltan campos obligatorios o hay un problema de formato en la base de datos.' });
+        } else {
+            res.status(500).json({ error: 'Error interno del servidor al añadir el producto.' });
+        }
     }
 });
 
@@ -83,13 +129,34 @@ router.post('/', protect, authorizeRoles('admin'), async (req, res) => {
 // MODIFICACIÓN: Añade authorizeRoles('admin') para restringir a admins
 router.put('/:id', protect, authorizeRoles('admin'), async (req, res) => {
     const { id } = req.params;
-    const { nombre, descripcion, precio, stock, unidad_de_medida, imagen_url, categoria, disponible } = req.body;
+    // >>>>>>>>>>>>>> MODIFICACIONES AQUÍ: Añadir puntos_canje a la desestructuración del PUT <<<<<<<<<<<<
+    const { nombre, descripcion, precio, stock, unidad_de_medida, imagen_url, categoria, disponible, puntos_canje } = req.body;
 
-    // Validación (similar a POST, pero todos son opcionales para la actualización)
-    if (precio !== undefined && (isNaN(precio) || precio <= 0)) {
-        return res.status(400).json({ error: 'El precio debe ser un número positivo.' });
+    // Determinar si se ingresó precio o puntos de canje (para backend)
+    const hasPriceInput = (precio !== undefined && precio !== null && precio !== '');
+    const hasPointsInput = (puntos_canje !== undefined && puntos_canje !== null && puntos_canje !== '');
+
+    // >>>>>>>>>>>>>> MODIFICACIONES AQUÍ: Nuevas validaciones para PUT <<<<<<<<<<<<
+    // Si ambos se envían o ninguno se envía en la actualización, es un error (si ambos campos están presentes en el body)
+    if (hasPriceInput && hasPointsInput) {
+        return res.status(400).json({ error: 'No puede actualizar Precio y Puntos de Canje a la vez. Elija uno.' });
     }
-    if (stock !== undefined && (isNaN(stock) || stock < 0)) {
+    // Si se envía precio, validar que sea positivo
+    if (hasPriceInput) {
+        if (isNaN(precio) || parseFloat(precio) <= 0) {
+            return res.status(400).json({ error: 'El precio debe ser un número positivo.' });
+        }
+    }
+    // Si se envía puntos_canje, validar que sea no negativo
+    if (hasPointsInput) {
+        if (isNaN(puntos_canje) || parseInt(puntos_canje) < 0) {
+            return res.status(400).json({ error: 'Los puntos de canje deben ser un número no negativo.' });
+        }
+    }
+    // >>>>>>>>>>>>>> FIN MODIFICACIONES EN VALIDACIONES PUT <<<<<<<<<<<<<<<<
+
+    // Validación de stock (ya estaba bien, solo la reordenamos si fuese necesario)
+    if (stock !== undefined && (isNaN(stock) || parseInt(stock) < 0)) {
         return res.status(400).json({ error: 'El stock debe ser un número no negativo.' });
     }
 
@@ -100,8 +167,22 @@ router.put('/:id', protect, authorizeRoles('admin'), async (req, res) => {
 
         if (nombre !== undefined) { fields.push(`nombre = $${queryIndex++}`); values.push(nombre); }
         if (descripcion !== undefined) { fields.push(`descripcion = $${queryIndex++}`); values.push(descripcion); }
-        if (precio !== undefined) { fields.push(`precio = $${queryIndex++}`); values.push(precio); }
-        if (stock !== undefined) { fields.push(`stock = $${queryIndex++}`); values.push(stock); }
+        
+        // >>>>>>>>>>>>>> MODIFICACIONES AQUÍ: Manejo de precio y puntos_canje en UPDATE <<<<<<<<<<<<
+        if (hasPriceInput) { // Si se envió precio, actualizamos precio a su valor y puntos_canje a null
+            fields.push(`precio = $${queryIndex++}`); values.push(parseFloat(precio));
+            fields.push(`puntos_canje = $${queryIndex++}`); values.push(null); 
+        } else if (hasPointsInput) { // Si se envió puntos_canje, actualizamos puntos_canje a su valor y precio a null
+            fields.push(`puntos_canje = $${queryIndex++}`); values.push(parseInt(puntos_canje));
+            fields.push(`precio = $${queryIndex++}`); values.push(null);
+        } else { // Si ninguno se envió, pero los campos existen en el body, asegurarse de que no se modifiquen inadvertidamente.
+                 // Aquí optamos por no incluir el campo en la actualización si no se proporcionó un valor explícito.
+                 // Si quisieras que enviar vacío significara NULL, la lógica sería diferente.
+                 // Por simplicidad, si no se envió precio ni puntos, no los incluimos en el update SET
+        }
+        // >>>>>>>>>>>>>> FIN MODIFICACIONES EN UPDATE <<<<<<<<<<<<<<<<
+
+        if (stock !== undefined) { fields.push(`stock = $${queryIndex++}`); values.push(parseInt(stock)); }
         if (unidad_de_medida !== undefined) { fields.push(`unidad_de_medida = $${queryIndex++}`); values.push(unidad_de_medida); }
         if (imagen_url !== undefined) { fields.push(`imagen_url = $${queryIndex++}`); values.push(imagen_url); }
         if (categoria !== undefined) { fields.push(`categoria = $${queryIndex++}`); values.push(categoria); }

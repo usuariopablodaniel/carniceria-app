@@ -1,17 +1,18 @@
 import React from 'react';
-import { Card, Button, Badge, Alert, Spinner } from 'react-bootstrap'; // Agregamos Alert y Spinner para posibles mensajes/estados locales
+import { Card, Button, Badge, Alert, Spinner } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import axios from '../api/axios'; // Importar la instancia de Axios configurada
+import axios from '../api/axios';
 
 // Añadimos 'onProductDeleted' como prop, para que el componente padre (ProductListPage)
 // sepa cuándo un producto ha sido eliminado y pueda recargar la lista.
 const ProductCard = ({ product, onProductDeleted }) => {
     const navigate = useNavigate();
     const { isAuthenticated, user } = useAuth();
-    const [loading, setLoading] = React.useState(false); // Estado para indicar que la eliminación está en curso
-    const [error, setError] = React.useState(null); // Estado para errores de eliminación
+    const [loading, setLoading] = React.useState(false);
+    const [error, setError] = React.useState(null);
 
+    // Función para formatear el precio a moneda argentina (ARS)
     const formatPrice = (price) => {
         return new Intl.NumberFormat('es-AR', {
             style: 'currency',
@@ -20,56 +21,60 @@ const ProductCard = ({ product, onProductDeleted }) => {
         }).format(price);
     };
 
+    // Función para manejar imagen_url vacía o error
     const getImageUrl = (url) => {
         if (!url || url.trim() === '') {
-            return 'https://via.placeholder.com/180x180?text=Sin+Imagen';
+            // >>>>>>>>>>>>>>> ESTA ES LA RUTA PARA TUS IMÁGENES LOCALES <<<<<<<<<<<<<<<<
+            // Asegúrate de que esta imagen exista en src/assets/images/placeholder.png
+            // O, si sigues mi recomendación de la carpeta public: /images/placeholder.png
+            // He cambiado a rutas relativas a `public` que son más sencillas para assets estáticos.
+            return '/images/placeholder.png'; 
         }
         return url;
     };
 
+    // Función para manejar errores de carga de imagen
     const handleImageError = (e) => {
         e.target.onerror = null;
-        e.target.src = 'https://via.placeholder.com/180x180?text=Error+Carga+Imagen';
+        // >>>>>>>>>>>>>>> ESTA ES LA RUTA PARA TUS IMÁGENES LOCALES <<<<<<<<<<<<<<<<
+        // Asegúrate de que esta imagen exista en src/assets/images/error_image.png
+        // O, si sigues mi recomendación de la carpeta public: /images/error_image.png
+        e.target.src = '/images/error_image.png'; // Fallback final
     };
 
     const handleDelete = async () => {
-        setError(null); // Limpiar errores previos
+        setError(null);
         if (window.confirm(`¿Estás seguro de que quieres eliminar el producto "${product.nombre}"? Esta acción es irreversible.`)) {
-            setLoading(true); // Indicar que la eliminación está en progreso
+            setLoading(true);
             try {
-                // Axios ya incluye el token por el interceptor
                 const response = await axios.delete(`/products/${product.id}`); 
                 
-                if (response.status === 200) { // 200 OK para DELETE exitoso
+                if (response.status === 200) {
                     console.log('Producto eliminado:', product.nombre);
                     if (onProductDeleted) {
-                        onProductDeleted(product.id); // Notificar al padre que el producto fue eliminado
+                        onProductDeleted(product.id);
                     }
                 } else {
-                    // Axios debería capturar esto en el catch, pero por si acaso
                     setError(response.data.error || 'Error desconocido al eliminar el producto.');
                 }
             } catch (err) {
                 console.error('Error al eliminar producto:', err);
                 if (err.response) {
-                    // Error de la API (ej. 403 Forbidden, 404 Not Found)
                     setError(err.response.data.error || 'No se pudo eliminar el producto.');
                 } else if (err.request) {
-                    // La petición fue hecha pero no hubo respuesta
                     setError('No se pudo conectar con el servidor.');
                 } else {
-                    // Otros errores
                     setError('Ocurrió un error inesperado.');
                 }
             } finally {
-                setLoading(false); // Finalizar el estado de carga
+                setLoading(false);
             }
         }
     };
 
     return (
         <Card className="h-100 shadow-sm rounded-lg" style={{ border: '1px solid #e0e0e0' }}>
-            {error && <Alert variant="danger" className="m-2">{error}</Alert>} {/* Mostrar error si existe */}
+            {error && <Alert variant="danger" className="m-2">{error}</Alert>}
             <Card.Img
                 variant="top"
                 src={getImageUrl(product.imagen_url)}
@@ -96,9 +101,18 @@ const ProductCard = ({ product, onProductDeleted }) => {
                 </Card.Text>
                 
                 <div className="mt-auto pt-2">
-                    <Card.Text className="mb-1 text-primary fw-bold fs-5">
-                        {formatPrice(product.precio)} / {product.unidad_de_medida}
-                    </Card.Text>
+                    {/* >>>>>>>>>>>>> LÓGICA CONDICIONAL PARA PRECIO O PUNTOS_CANJE <<<<<<<<<<<<< */}
+                    {product.puntos_canje !== null && product.puntos_canje !== undefined ? (
+                        <Card.Text className="mb-1 text-success fw-bold fs-5">
+                            {product.puntos_canje} Puntos
+                        </Card.Text>
+                    ) : (
+                        <Card.Text className="mb-1 text-primary fw-bold fs-5">
+                            {formatPrice(product.precio)} / {product.unidad_de_medida}
+                        </Card.Text>
+                    )}
+                    {/* >>>>>>>>>>>>> FIN LÓGICA CONDICIONAL <<<<<<<<<<<<< */}
+
                     <Card.Text className="mb-1 text-secondary">
                         Stock: {product.stock}
                     </Card.Text>
@@ -116,7 +130,7 @@ const ProductCard = ({ product, onProductDeleted }) => {
                             size="sm" 
                             className="flex-fill me-1"
                             onClick={() => navigate(`/products/edit/${product.id}`)}
-                            disabled={loading} // Deshabilitar si se está eliminando
+                            disabled={loading}
                         >
                             Editar
                         </Button>
@@ -124,10 +138,18 @@ const ProductCard = ({ product, onProductDeleted }) => {
                             variant="outline-danger" 
                             size="sm" 
                             className="flex-fill ms-1"
-                            onClick={handleDelete} // Cambiamos el onClick para llamar a handleDelete
-                            disabled={loading} // Deshabilitar durante la eliminación
+                            onClick={handleDelete}
+                            disabled={loading}
                         >
                             {loading ? <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" /> : 'Eliminar'}
+                        </Button>
+                    </div>
+                )}
+                {/* >>>>>>>>> Botón para canjear productos (visible para usuarios normales en la página de canje) <<<<<<<<< */}
+                {isAuthenticated && user && user.role === 'user' && product.puntos_canje !== null && product.puntos_canje !== undefined && (
+                    <div className="d-grid gap-2 mt-3">
+                        <Button variant="success" size="md">
+                            Canjear por {product.puntos_canje} Puntos
                         </Button>
                     </div>
                 )}

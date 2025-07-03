@@ -29,14 +29,15 @@ CREATE TABLE IF NOT EXISTS productos (
     id SERIAL PRIMARY KEY,
     nombre VARCHAR(255) NOT NULL,
     descripcion TEXT,
-    precio DECIMAL(10, 2) NOT NULL,
+    precio DECIMAL(10, 2), -- <<<<<<<<<<<<<< CORREGIDO: Ya no tiene NOT NULL
     stock INT NOT NULL DEFAULT 0,
     unidad_de_medida VARCHAR(50), -- Ejemplo: 'kg', 'unidad', 'paquete'
     imagen_url VARCHAR(255), -- Para la URL de una imagen del producto
     categoria VARCHAR(100), -- Ejemplo: 'Res', 'Cerdo', 'Aves', 'Embutidos'
     disponible BOOLEAN DEFAULT TRUE, -- Si el producto está activo para la venta
     fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    fecha_actualizacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    fecha_actualizacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    puntos_canje INTEGER -- <<<<<<<<<<<<<< AÑADIDO: Nueva columna para puntos de canje (permite NULL por defecto)
 );
 
 -- Opcional: Función y Trigger para actualizar fecha_actualizacion de productos
