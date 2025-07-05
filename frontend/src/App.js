@@ -15,10 +15,10 @@ import ProductAddPage from './pages/ProductAddPage';
 import ProductListPage from './pages/ProductListPage';
 import RegisterPage from './pages/RegisterPage';
 import GoogleAuthCallback from './pages/GoogleAuthCallback'; 
-
 import ProductEditPage from './pages/ProductEditPage'; 
-// >>>>>>>>>>>>>>> NUEVA IMPORTACIÓN PARA LA PÁGINA DE CANJE <<<<<<<<<<<<<<<<
 import RedemptionProductsPage from './pages/RedemptionProductsPage'; 
+// >>>>>>>>>>>>>>> CORRECCIÓN AQUÍ: NUEVA IMPORTACIÓN PARA SCANQRPage <<<<<<<<<<<<<<<<
+import ScanQRPage from './pages/ScanQRPage'; 
 
 function App() {
   return (
@@ -34,10 +34,7 @@ function App() {
               
               <Route path="/auth/google/callback" element={<GoogleAuthCallback />} />
               
-              {/* Esta ruta ahora muestra solo productos de venta/ofertas */}
               <Route path="/products" element={<ProductListPage />} />
-
-              {/* >>>>>>>>>>>>>>> NUEVA RUTA PARA PRODUCTOS DE CANJE <<<<<<<<<<<<<<<< */}
               <Route path="/redemption-products" element={<RedemptionProductsPage />} />
 
               {/* RUTAS PROTEGIDAS */}
@@ -62,6 +59,15 @@ function App() {
                 element={
                   <PrivateRoute>
                     <ProductEditPage />
+                  </PrivateRoute>
+                }
+              />
+              {/* >>>>>>>>>>>>>>> CORRECCIÓN AQUÍ: NUEVA RUTA PROTEGIDA PARA ESCANEAR QR <<<<<<<<<<<<<<<< */}
+              <Route
+                path="/scan-qr" 
+                element={
+                  <PrivateRoute>
+                    <ScanQRPage />
                   </PrivateRoute>
                 }
               />

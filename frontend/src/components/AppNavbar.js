@@ -1,78 +1,80 @@
 import React from 'react';
-import { Navbar, Nav, Container, Button } from 'react-bootstrap';
-import { LinkContainer } from 'react-router-bootstrap';
-import { Link } from 'react-router-dom'; // Mantener Link para botones fuera de LinkContainer
-import { useAuth } from '../context/AuthContext'; // <<<<<<< IMPORTANTE: Importa useAuth
-
+import { Navbar, Nav, Button, Container } from 'react-bootstrap';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext'; // Importa el contexto de autenticación
 
 const AppNavbar = () => {
-  // <<<<<<<<< CAMBIO CLAVE AQUÍ: Obtén los valores del AuthContext >>>>>>>>>>
-  const { isAuthenticated, logout, user } = useAuth(); 
-  // No necesitamos useNavigate directamente en AppNavbar para el logout,
-  // ya que la función logout del contexto ya maneja la navegación.
+    const { isAuthenticated, user, logout } = useAuth(); // Obtener estado de autenticación y función logout
+    const navigate = useNavigate();
 
-  // La función handleLogout ya no es necesaria aquí si solo se encarga de llamar a logout del contexto
-  // Sin embargo, si quieres mantenerla para logs o lógica adicional:
-  const handleNavbarLogout = () => {
-    console.log('Cerrando sesión desde Navbar...');
-    logout(); // Llama a la función logout del AuthContext
-    // No necesitas navigate('/login') o window.location.reload() aquí,
-    // ya que 'logout()' del contexto ya maneja la redirección y la limpieza.
-  };
+    const handleLogout = () => {
+        logout(); // Llama a la función de logout del contexto
+        navigate('/login'); // Redirige al usuario a la página de login después de cerrar sesión
+    };
 
-  return (
-    <Navbar bg="dark" variant="dark" expand="lg">
-      <Container>
-        <LinkContainer to="/">
-          <Navbar.Brand>Carnicería App</Navbar.Brand>
-        </LinkContainer>
+    return (
+        <Navbar bg="dark" variant="dark" expand="lg" className="shadow-sm">
+            <Container>
+                <Navbar.Brand as={NavLink} to="/">Carnicería App</Navbar.Brand>
+                <Navbar.Toggle aria-controls="basic-navbar-nav" />
+                <Navbar.Collapse id="basic-navbar-nav">
+                    <Nav className="me-auto">
+                        {/* Enlaces siempre visibles o condicionales para todos los usuarios */}
+                        {/* 'Ofertas' será la página principal de productos en venta */}
+                        <Nav.Link as={NavLink} to="/products" className="text-white">Ofertas</Nav.Link>
+                        
+                        {/* 'Canje por Puntos' para todos los usuarios, pero el botón de canjear solo para 'user' */}
+                        <Nav.Link as={NavLink} to="/redemption-products" className="text-white">Canje por Puntos</Nav.Link>
 
-        <Navbar.Toggle aria-controls="basic-navbar-nav" />
-        <Navbar.Collapse id="basic-navbar-nav">
-          <Nav className="me-auto">
-            {/* Estos enlaces se mostrarán si el usuario está autenticado */}
-            {isAuthenticated && (
-              <>
-                <LinkContainer to="/products">
-                  <Nav.Link>Productos</Nav.Link>
-                </LinkContainer>
-                <LinkContainer to="/dashboard">
-                  <Nav.Link>Mi Perfil</Nav.Link>
-                </LinkContainer>
-                {/* Opcional: Enlace para añadir productos solo si es admin */}
-                {isAuthenticated && user && user.role === 'admin' && (
-                  <LinkContainer to="/products/add">
-                    <Nav.Link>Añadir Producto</Nav.Link>
-                  </LinkContainer>
-                )}
-              </>
-            )}
-          </Nav>
-          <Nav>
-            {/* Lógica para mostrar Iniciar Sesión/Registrarse o Cerrar Sesión */}
-            {!isAuthenticated ? (
-              <>
-                <Link to="/login" style={{ textDecoration: 'none' }}>
-                  <Button variant="outline-light" className="me-2">Iniciar Sesión</Button>
-                </Link>
-                <Link to="/register" style={{ textDecoration: 'none' }}>
-                  <Button variant="light">Registrarse</Button>
-                </Link>
-              </>
-            ) : (
-              // Si el usuario está autenticado, muestra el nombre y el botón de cerrar sesión
-              <>
-                {user && <Nav.Link className="text-light me-2">Hola, {user.nombre}!</Nav.Link>} {/* Muestra el nombre del usuario */}
-                <Button variant="outline-light" onClick={handleNavbarLogout}> {/* Llama a la nueva función de logout */}
-                  Cerrar Sesión
-                </Button>
-              </>
-            )}
-          </Nav>
-        </Navbar.Collapse>
-      </Container>
-    </Navbar>
-  );
+                        {/* Enlaces visibles solo para ADMINISTRADORES */}
+                        {isAuthenticated && user && user.role === 'admin' && (
+                            <>
+                                <Nav.Link as={NavLink} to="/products/add" className="text-white">Añadir Producto</Nav.Link>
+                                {/* Podrías añadir un enlace a una página de gestión de usuarios si la creas */}
+                                {/* <Nav.Link as={NavLink} to="/admin/users" className="text-white">Gestionar Usuarios</Nav.Link> */}
+                            </>
+                        )}
+
+                        {/* Enlace al Dashboard, visible para cualquier usuario autenticado */}
+                        {isAuthenticated && (
+                            <Nav.Link as={NavLink} to="/dashboard" className="text-white">Dashboard</Nav.Link>
+                        )}
+                    </Nav>
+                    <Nav>
+                        {/* Botones de autenticación */}
+                        {isAuthenticated ? (
+                            // Si está autenticado, muestra el nombre del usuario y el botón de cerrar sesión
+                            <>
+                                <Navbar.Text className="text-white me-3">
+                                    Hola, {user ? user.name : 'Usuario'}!
+                                </Navbar.Text>
+                                <Button variant="outline-light" onClick={handleLogout}>
+                                    Cerrar Sesión
+                                </Button>
+                            </>
+                        ) : (
+                            // Si no está autenticado, muestra los botones de Iniciar Sesión y Registrarse
+                            <>
+                                <Button 
+                                    variant="outline-light" 
+                                    className="me-2" 
+                                    onClick={() => navigate('/login')}
+                                >
+                                    Iniciar Sesión
+                                </Button>
+                                <Button 
+                                    variant="light" 
+                                    onClick={() => navigate('/register')}
+                                >
+                                    Registrarse
+                                </Button>
+                            </>
+                        )}
+                    </Nav>
+                </Navbar.Collapse>
+            </Container>
+        </Navbar>
+    );
 };
 
 export default AppNavbar;
