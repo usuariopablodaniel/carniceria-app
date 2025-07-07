@@ -1,4 +1,4 @@
-// backend/routes/auth.js (REVISADO)
+// backend/routes/auth.js
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
@@ -57,10 +57,6 @@ router.post('/register', async (req, res) => {
         res.status(201).json({
             message: 'Usuario registrado exitosamente',
             token,
-            // Aquí en el login tradicional y registro, seguimos enviando 'cliente' en el JSON.
-            // Esto es un JSON de respuesta, no un parámetro de URL, por lo que es menos crítico.
-            // Para consistencia total, podrías cambiar este 'cliente' a 'user' también,
-            // y luego actualizar LoginPage.js para esperar 'user'. Por ahora, lo dejamos así.
             cliente: { 
                 id: cliente.id,
                 nombre: cliente.nombre,
@@ -111,7 +107,6 @@ router.post('/login', async (req, res) => {
         res.json({
             message: 'Inicio de sesión exitoso',
             token,
-            // Aquí también mantenemos 'cliente' en el JSON de respuesta.
             cliente: { 
                 id: cliente.id,
                 nombre: cliente.nombre,
@@ -129,13 +124,18 @@ router.post('/login', async (req, res) => {
 
 // --- Ruta Protegida: Obtener Perfil del Usuario Autenticado ---
 router.get('/me', protect, async (req, res) => {
-    res.status(200).json({
-        id: req.user.id,
-        nombre: req.user.nombre,
-        email: req.user.email,
-        puntos_actuales: req.user.puntos_actuales,
-        role: req.user.role, 
-    });
+    try {
+        // req.user is set by the protect middleware, but it only has id, email, role from token.
+        // We need to query the DB to get 'nombre' and 'puntos_actuales'
+        const result = await pool.query('SELECT id, nombre, email, puntos_actuales, role FROM clientes WHERE id = $1', [req.user.id]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Usuario no encontrado.' });
+        }
+        res.status(200).json(result.rows[0]);
+    } catch (err) {
+        console.error('Error al obtener datos del usuario autenticado:', err.message);
+        res.status(500).json({ error: 'Error interno del servidor al obtener datos del usuario.' });
+    }
 });
 
 
@@ -169,7 +169,7 @@ router.get('/google/callback',
 
             const clienteParaFrontend = {
                 id: cliente.id,
-                nombre: cliente.nombre,
+                nombre: cliente.nombre, // Usar 'nombre' aquí
                 email: cliente.email,
                 puntos_actuales: cliente.puntos_actuales,
                 google_id: cliente.google_id,
@@ -178,12 +178,7 @@ router.get('/google/callback',
 
             console.log('Datos de cliente a enviar al frontend para Google login:', clienteParaFrontend);
 
-            // <<<<<<<<<<<< CAMBIO CLAVE AQUÍ: 'cliente' A 'user' >>>>>>>>>>>>
             res.redirect(`http://localhost:3000/auth/google/callback?token=${token}&user=${encodeURIComponent(JSON.stringify(clienteParaFrontend))}`);
-            // NOTA: Cambié de '/dashboard' a '/auth/google/callback' porque es la ruta que tu frontend espera para procesar.
-            // Si quieres que vaya directamente al dashboard desde el backend, deberías cambiar la lógica en AuthContext.js
-            // para que no espere en /auth/google/callback sino en el useEffect del AuthProvider en cualquier ruta.
-            // Pero mantener el callback es más robusto para procesar los parámetros.
 
         } catch (err) {
             console.error('Error en Google callback al procesar cliente:', err);
@@ -191,5 +186,31 @@ router.get('/google/callback',
         }
     }
 );
+
+// >>>>>>>>>>>>>>> NUEVA RUTA PARA OBTENER USUARIO POR ID <<<<<<<<<<<<<<<<
+// @route   GET /api/auth/user/:id
+// @desc    Get user data by ID (protected, only for admin/employees or the user itself)
+// @access  Private (requires token)
+router.get('/user/:id', protect, async (req, res) => {
+    const { id } = req.params;
+    const requestingUser = req.user; // Usuario autenticado del token
+
+    // Lógica de autorización: un usuario solo puede ver sus propios datos, a menos que sea admin o empleado
+    if (requestingUser.role !== 'admin' && requestingUser.role !== 'employee' && requestingUser.id.toString() !== id.toString()) {
+        return res.status(403).json({ error: 'No autorizado para ver los datos de este usuario.' });
+    }
+
+    try {
+        // Usar 'nombre' en la consulta SELECT para que coincida con tu esquema
+        const result = await pool.query('SELECT id, nombre, email, role, puntos_actuales FROM clientes WHERE id = $1', [id]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Usuario no encontrado.' });
+        }
+        res.status(200).json({ user: result.rows[0] }); // Envolver el resultado en un objeto 'user'
+    } catch (err) {
+        console.error('Error al obtener usuario por ID:', err.message);
+        res.status(500).json({ error: 'Error interno del servidor al obtener el usuario.' });
+    }
+});
 
 module.exports = router;

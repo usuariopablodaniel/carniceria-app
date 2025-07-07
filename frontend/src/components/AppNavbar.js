@@ -1,15 +1,17 @@
+// frontend/src/components/AppNavbar.js
 import React from 'react';
-import { Navbar, Nav, Button, Container } from 'react-bootstrap';
+// >>>>>>>>>>>>>>> CORRECCIÓN AQUÍ: Cambiado '=' por 'from' <<<<<<<<<<<<<<<<
+import { Navbar, Nav, Button, Container } from 'react-bootstrap'; 
 import { NavLink, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext'; // Importa el contexto de autenticación
+import { useAuth } from '../context/AuthContext';
 
 const AppNavbar = () => {
-    const { isAuthenticated, user, logout } = useAuth(); // Obtener estado de autenticación y función logout
+    const { isAuthenticated, user, logout } = useAuth();
     const navigate = useNavigate();
 
     const handleLogout = () => {
-        logout(); // Llama a la función de logout del contexto
-        navigate('/login'); // Redirige al usuario a la página de login después de cerrar sesión
+        logout();
+        navigate('/login');
     };
 
     return (
@@ -23,15 +25,14 @@ const AppNavbar = () => {
                         {/* 'Ofertas' será la página principal de productos en venta */}
                         <Nav.Link as={NavLink} to="/products" className="text-white">Ofertas</Nav.Link>
                         
-                        {/* 'Canje por Puntos' para todos los usuarios, pero el botón de canjear solo para 'user' */}
+                        {/* 'Canje por Puntos' visible para todos los usuarios */}
                         <Nav.Link as={NavLink} to="/redemption-products" className="text-white">Canje por Puntos</Nav.Link>
 
-                        {/* Enlaces visibles solo para ADMINISTRADORES */}
-                        {isAuthenticated && user && user.role === 'admin' && (
+                        {/* Enlaces visibles solo para ADMINISTRADORES o EMPLEADOS */}
+                        {isAuthenticated && user && (user.role === 'admin' || user.role === 'employee') && (
                             <>
                                 <Nav.Link as={NavLink} to="/products/add" className="text-white">Añadir Producto</Nav.Link>
-                                {/* Podrías añadir un enlace a una página de gestión de usuarios si la creas */}
-                                {/* <Nav.Link as={NavLink} to="/admin/users" className="text-white">Gestionar Usuarios</Nav.Link> */}
+                                <Nav.Link as={NavLink} to="/scan-qr" className="text-white">Escanear QR</Nav.Link> 
                             </>
                         )}
 
@@ -43,7 +44,6 @@ const AppNavbar = () => {
                     <Nav>
                         {/* Botones de autenticación */}
                         {isAuthenticated ? (
-                            // Si está autenticado, muestra el nombre del usuario y el botón de cerrar sesión
                             <>
                                 <Navbar.Text className="text-white me-3">
                                     Hola, {user ? user.name : 'Usuario'}!
@@ -53,7 +53,6 @@ const AppNavbar = () => {
                                 </Button>
                             </>
                         ) : (
-                            // Si no está autenticado, muestra los botones de Iniciar Sesión y Registrarse
                             <>
                                 <Button 
                                     variant="outline-light" 
