@@ -1,6 +1,5 @@
 // frontend/src/components/AppNavbar.js
 import React from 'react';
-// >>>>>>>>>>>>>>> CORRECCIÓN AQUÍ: Cambiado '=' por 'from' <<<<<<<<<<<<<<<<
 import { Navbar, Nav, Button, Container } from 'react-bootstrap'; 
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -8,6 +7,9 @@ import { useAuth } from '../context/AuthContext';
 const AppNavbar = () => {
     const { isAuthenticated, user, logout } = useAuth();
     const navigate = useNavigate();
+
+    // Aquí podemos verificar si el usuario es administrador de manera sencilla
+    const isAdmin = isAuthenticated && user && user.role === 'admin';
 
     const handleLogout = () => {
         logout();
@@ -35,6 +37,11 @@ const AppNavbar = () => {
                                 <Nav.Link as={NavLink} to="/scan-qr" className="text-white">Escanear QR</Nav.Link> 
                             </>
                         )}
+                        
+                        {/* >>>>>>>>>>>>> Enlace de Gestión de Usuarios (SOLO ADMIN) <<<<<<<<<<<<< */}
+                        {isAdmin && (
+                            <Nav.Link as={NavLink} to="/users" className="text-white">Gestión de Usuarios</Nav.Link>
+                        )}
 
                         {/* Enlace al Dashboard, visible para cualquier usuario autenticado */}
                         {isAuthenticated && (
@@ -46,7 +53,8 @@ const AppNavbar = () => {
                         {isAuthenticated ? (
                             <>
                                 <Navbar.Text className="text-white me-3">
-                                    Hola, {user ? user.name : 'Usuario'}!
+                                    {/* Mostrar el nombre del usuario si existe, si no, 'Usuario' */}
+                                    Hola, {user ? user.nombre || user.name : 'Usuario'}! 
                                 </Navbar.Text>
                                 <Button variant="outline-light" onClick={handleLogout}>
                                     Cerrar Sesión

@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 
-const { protect } = require('../middleware/authMiddleware');
+const { protect, authorizeRoles } = require('../middleware/authMiddleware');
 const passport = require('passport');
 
 // Configuración de la base de datos (usando las variables de entorno de .env)
@@ -125,8 +125,6 @@ router.post('/login', async (req, res) => {
 // --- Ruta Protegida: Obtener Perfil del Usuario Autenticado ---
 router.get('/me', protect, async (req, res) => {
     try {
-        // req.user is set by the protect middleware, but it only has id, email, role from token.
-        // We need to query the DB to get 'nombre' and 'puntos_actuales'
         const result = await pool.query('SELECT id, nombre, email, puntos_actuales, role FROM clientes WHERE id = $1', [req.user.id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Usuario no encontrado.' });
@@ -169,7 +167,7 @@ router.get('/google/callback',
 
             const clienteParaFrontend = {
                 id: cliente.id,
-                nombre: cliente.nombre, // Usar 'nombre' aquí
+                nombre: cliente.nombre,
                 email: cliente.email,
                 puntos_actuales: cliente.puntos_actuales,
                 google_id: cliente.google_id,
@@ -187,7 +185,9 @@ router.get('/google/callback',
     }
 );
 
-// >>>>>>>>>>>>>>> NUEVA RUTA PARA OBTENER USUARIO POR ID <<<<<<<<<<<<<<<<
+// --- Rutas de Gestión de Usuarios (SOLO ADMINISTRADORES) ---
+
+// >>>>>>>>>>>>>>> RUTA PARA OBTENER USUARIO POR ID <<<<<<<<<<<<<<<<
 // @route   GET /api/auth/user/:id
 // @desc    Get user data by ID (protected, only for admin/employees or the user itself)
 // @access  Private (requires token)
@@ -210,6 +210,77 @@ router.get('/user/:id', protect, async (req, res) => {
     } catch (err) {
         console.error('Error al obtener usuario por ID:', err.message);
         res.status(500).json({ error: 'Error interno del servidor al obtener el usuario.' });
+    }
+});
+
+
+// >>>>>>>>>>>>>>> RUTA PARA OBTENER LISTA DE USUARIOS <<<<<<<<<<<<<<<<
+// @route   GET /api/auth/users
+// @desc    Obtener lista de todos los usuarios
+// @access  Private (Admin only)
+router.get('/users', protect, authorizeRoles('admin'), async (req, res) => {
+    try {
+        // CORREGIDO: Usamos 'fecha_registro' en lugar de 'fecha_creacion' para coincidir con la BD
+        const result = await pool.query('SELECT id, nombre, email, role, puntos_actuales, telefono, fecha_registro FROM clientes ORDER BY fecha_registro DESC');
+        res.status(200).json({ users: result.rows });
+    } catch (err) {
+        console.error('Error al listar usuarios:', err.message);
+        res.status(500).json({ error: 'Error interno del servidor al obtener la lista de usuarios.' });
+    }
+});
+
+// >>>>>>>>>>>>>>> RUTA PARA ACTUALIZAR USUARIO (CAMBIAR ROL) <<<<<<<<<<<<<<<<
+// @route   PUT /api/auth/users/:id
+// @desc    Actualizar un usuario (ej. cambiar rol)
+// @access  Private (Admin only)
+router.put('/users/:id', protect, authorizeRoles('admin'), async (req, res) => {
+    const { id } = req.params;
+    const { role } = req.body; 
+
+    try {
+        const existingUser = await pool.query('SELECT id FROM clientes WHERE id = $1', [id]);
+        if (existingUser.rows.length === 0) {
+            return res.status(404).json({ error: 'Usuario no encontrado.' });
+        }
+
+        if (role) {
+            const updateQuery = 'UPDATE clientes SET role = $1 WHERE id = $2 RETURNING id, nombre, email, role';
+            const updatedUser = await pool.query(updateQuery, [role, id]);
+            
+            return res.status(200).json({ 
+                message: `Rol del usuario ${id} actualizado a ${role}`,
+                user: updatedUser.rows[0]
+            });
+        }
+
+        res.status(400).json({ error: 'No se proporcionaron datos válidos para la actualización.' });
+
+    } catch (err) {
+        console.error('Error al actualizar usuario:', err.message);
+        res.status(500).json({ error: 'Error interno del servidor al actualizar el usuario.' });
+    }
+});
+
+// >>>>>>>>>>>>>>> RUTA PARA ELIMINAR USUARIO <<<<<<<<<<<<<<<<
+// @route   DELETE /api/auth/users/:id
+// @desc    Eliminar un usuario
+// @access  Private (Admin only)
+router.delete('/users/:id', protect, authorizeRoles('admin'), async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const deleteQuery = 'DELETE FROM clientes WHERE id = $1 RETURNING *';
+        const result = await pool.query(deleteQuery, [id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Usuario no encontrado para eliminar.' });
+        }
+
+        res.status(200).json({ message: 'Usuario eliminado exitosamente', user_id: id });
+
+    } catch (err) {
+        console.error('Error al eliminar usuario:', err.message);
+        res.status(500).json({ error: 'Error interno del servidor al eliminar el usuario.' });
     }
 });
 
