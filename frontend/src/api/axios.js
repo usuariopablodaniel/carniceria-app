@@ -1,8 +1,10 @@
+// axios.js
 import axios from 'axios';
 
 // Crea una instancia de Axios
 const api = axios.create({
-  baseURL: 'http://localhost:5000/api', // Asegúrate de que esta sea la URL de tu backend
+  // >>>>>>>>>>>>>>> VOLVEMOS A localhost <<<<<<<<<<<<<<<<
+  baseURL: 'http://localhost:5000/api' , // Asegúrate de que esta sea la URL de tu backend
   headers: {
     'Content-Type': 'application/json',
   },
@@ -24,7 +26,7 @@ api.interceptors.request.use(
   }
 );
 
-// <<<<<<<<<<<<<<< NUEVO: Interceptor para manejar errores de respuesta (401, 403) >>>>>>>>>>>>>>>
+// Interceptor para manejar errores de respuesta (401, 403)
 api.interceptors.response.use(
   (response) => response, // Si la respuesta es exitosa, simplemente la pasamos
   async (error) => {

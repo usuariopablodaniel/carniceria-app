@@ -14,11 +14,8 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 // *** Importaciones de Rutas ***
-// Asumiendo que tu archivo de rutas de autenticación es 'auth.js'
 const authRoutes = require('./routes/auth');
-// Y tu archivo de rutas de productos es 'productRoutes.js'
 const productRoutes = require('./routes/productRoutes');
-// >>>>>>>>>>>>>>> NUEVA IMPORTACIÓN PARA RUTAS DE TRANSACCIONES <<<<<<<<<<<<<<<<
 const transactionRoutes = require('./routes/transactionRoutes'); 
 
 // Configuración de la base de datos PostgreSQL
@@ -32,6 +29,7 @@ const pool = new Pool({
 
 // Middleware
 app.use(cors({
+    // >>>>>>>>>>>>>>> VOLVEMOS A localhost <<<<<<<<<<<<<<<<
     origin: 'http://localhost:3000', // Asegúrate de que esta sea la URL de tu frontend
     credentials: true // Muy importante para las cookies de sesión de Passport
 }));
@@ -52,7 +50,6 @@ app.use(passport.session());
 // *** Uso de Rutas ***
 app.use('/api/auth', authRoutes); // Tus rutas de autenticación
 app.use('/api/products', productRoutes); // Tus rutas de productos
-// >>>>>>>>>>>>>>> NUEVA LÍNEA PARA USAR LAS RUTAS DE TRANSACCIONES <<<<<<<<<<<<<<<<
 app.use('/api/transactions', transactionRoutes); 
 
 // --- Rutas de Prueba para Verificar el Backend ---

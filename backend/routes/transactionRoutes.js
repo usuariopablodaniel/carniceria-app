@@ -37,7 +37,6 @@ router.post('/purchase', protect, async (req, res) => {
         const currentPoints = userResult.rows[0].puntos_actuales || 0;
 
         // 2. Calcular puntos a añadir (ej. 1 punto por cada $10000 ARS)
-        // >>>>>>>>>>>>>>> CORRECCIÓN AQUÍ: Dividir por 10000 <<<<<<<<<<<<<<<<
         const pointsToAdd = Math.floor(amount / 10000); 
         const newPoints = currentPoints + pointsToAdd;
 
@@ -75,8 +74,17 @@ router.post('/redeem', protect, async (req, res) => {
     const { userId, pointsToRedeem, productId } = req.body;
     const adminId = req.user.id; // ID del admin/empleado que realiza la operación
 
-    if (!userId || !pointsToRedeem || pointsToRedeem <= 0 || !productId) {
-        return res.status(400).json({ error: 'ID de usuario, puntos a canjear y ID de producto son requeridos.' });
+    // === MODIFICACIÓN: Validar y convertir productId a número ===
+    // Intentar convertir productId a un número si es una cadena, y validar que sea > 0
+    let validatedProductId = parseInt(productId, 10);
+
+    if (isNaN(validatedProductId) || validatedProductId <= 0) {
+        return res.status(400).json({ error: 'ID de producto inválido. Debe ser un número positivo.' });
+    }
+
+    // Validar parámetros requeridos
+    if (!userId || !pointsToRedeem || pointsToRedeem <= 0) {
+        return res.status(400).json({ error: 'ID de usuario y puntos a canjear son requeridos.' });
     }
 
     try {
@@ -96,10 +104,13 @@ router.post('/redeem', protect, async (req, res) => {
         }
 
         // 2. Obtener el producto de canje para verificar puntos_canje
-        const productResult = await pool.query('SELECT nombre, puntos_canje FROM productos WHERE id = $1', [productId]);
+        // Usar validatedProductId en la consulta
+        const productResult = await pool.query('SELECT nombre, puntos_canje FROM productos WHERE id = $1', [validatedProductId]);
+        
         if (productResult.rows.length === 0) {
             await pool.query('ROLLBACK');
-            return res.status(404).json({ error: 'Producto de canje no encontrado.' });
+            // Si el producto no existe en la tabla "productos", es por lo que falla la FK en la DB.
+            return res.status(404).json({ error: 'Producto de canje no encontrado en la base de datos de productos.' });
         }
         const product = productResult.rows[0];
 
@@ -118,7 +129,8 @@ router.post('/redeem', protect, async (req, res) => {
         // 4. Registrar la transacción de canje
         await pool.query(
             'INSERT INTO transacciones_puntos (cliente_id, tipo_transaccion, puntos_cantidad, premio_canjeado_id, fecha_transaccion, realizada_por_admin_id) VALUES ($1, $2, $3, $4, NOW(), $5)',
-            [userId, 'canje', -pointsToRedeem, productId, adminId] // Puntos afectados como negativo para canje
+            // Usar validatedProductId en el array de valores
+            [userId, 'canje', -pointsToRedeem, validatedProductId, adminId] 
         );
 
         await pool.query('COMMIT');

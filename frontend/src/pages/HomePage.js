@@ -37,12 +37,18 @@ const HomePage = () => {
         setIsSubmitting(true);
 
         try {
-            const response = await axios.post('/login', {
+            if (!formData.email || !formData.password) {
+                setError('Por favor, ingresa tu email y contraseña.');
+                setIsSubmitting(false);
+                return;
+            }
+
+            // >>> CAMBIO CLAVE AQUÍ: La ruta correcta es '/auth/login' <<<
+            const response = await axios.post('/auth/login', {
                 email: formData.email,
                 password: formData.password
             });
 
-            // <<<<<<<<<< CAMBIO CLAVE AQUÍ: PASA EL TOKEN Y EL OBJETO 'CLIENTE' DEL BACKEND >>>>>>>>>>
             // Tu backend para login tradicional envía el objeto de usuario bajo la clave 'cliente'
             if (response.data.token && response.data.cliente) {
                 // Pasamos el token y el objeto 'cliente' completo (que incluye el nombre)
@@ -71,11 +77,12 @@ const HomePage = () => {
         setIsSubmitting(true);
 
         try {
-            const response = await axios.post('/register', {
+            // La ruta para el registro es '/auth/register'
+            const response = await axios.post('/auth/register', {
                 nombre: formData.nombre,
                 email: formData.email,
                 password: formData.password,
-                telefono: formData.telefono // Opcional, dependiendo de si lo haces obligatorio o no
+                telefono: formData.telefono 
             });
             if (response.status === 201) {
                 setMessage('Registro exitoso! Por favor, inicia sesión.');
@@ -100,7 +107,10 @@ const HomePage = () => {
     };
 
     const handleGoogleLogin = () => {
-        window.location.href = `${process.env.REACT_APP_API_URL}/auth/google`;
+        // Asegúrate de que REACT_APP_API_URL no termine en /api
+        // Si termina en /api, entonces deberías usar `${process.env.REACT_APP_API_URL}/auth/google`
+        // Si no termina en /api, entonces `${process.env.REACT_APP_API_URL}/api/auth/google`
+        window.location.href = `${process.env.REACT_APP_API_URL}/api/auth/google`;
     };
 
     // Si ya está autenticado y cargado, no mostrar el formulario, se redirigirá.
@@ -121,7 +131,7 @@ const HomePage = () => {
 
                             {loadingAuth && ( // Mostrar spinner mientras AuthContext está cargando
                                 <div className="text-center mb-3">
-                                    <Spinner animation="border" role="status" className="me-2" />
+                                    <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
                                     <p className="d-inline">Cargando sesión...</p>
                                 </div>
                             )}
