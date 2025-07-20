@@ -1,71 +1,86 @@
-// frontend/src/pages/RedemptionProductsPage.js
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Container, Row, Col, Card, Spinner, Alert, Button } from 'react-bootstrap';
 import axios from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom'; // Importar useNavigate
+import { useNavigate } from 'react-router-dom';
 
 const RedemptionProductsPage = () => {
     const { user, isAuthenticated, loadingAuth } = useAuth();
-    const navigate = useNavigate(); // Inicializar useNavigate
+    const navigate = useNavigate();
     const [redemptionProducts, setRedemptionProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [userPoints, setUserPoints] = useState(null);
 
-    // Función para obtener los puntos del usuario actual
-    useEffect(() => {
-        const fetchUserPoints = async () => {
-            if (!isAuthenticated || !user || !user.id) {
-                setUserPoints(0);
-                return;
-            }
-            try {
-                const response = await axios.get(`/transactions/${user.id}/points`);
-                setUserPoints(response.data.points);
-            } catch (err) {
-                console.error('Error al obtener los puntos del usuario:', err);
-                setUserPoints(null); 
-            }
-        };
+    const fetchUserPoints = useCallback(async () => {
+        if (!isAuthenticated || !user || !user.id) {
+            setUserPoints(0);
+            return;
+        }
+        try {
+            const response = await axios.get(`/transactions/${user.id}/points`);
+            setUserPoints(response.data.points);
+        } catch (err) {
+            console.error('Error al obtener los puntos del usuario:', err);
+            setUserPoints(null);
+        }
+    }, [isAuthenticated, user]); // Dependencias para useCallback
 
+    const fetchRedemptionProducts = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const response = await axios.get('/products');
+            const redeemable = response.data.filter(p => p.puntos_canje !== null && p.puntos_canje > 0);
+            setRedemptionProducts(redeemable);
+        } catch (err) {
+            console.error('Error al cargar productos de canje:', err);
+            setError('No se pudieron cargar los productos disponibles para canje.');
+        } finally {
+            setLoading(false);
+        }
+    }, []); // Dependencias para useCallback
+
+    useEffect(() => {
         if (!loadingAuth) {
             fetchUserPoints();
         }
-    }, [isAuthenticated, user, loadingAuth]);
+    }, [isAuthenticated, user, loadingAuth, fetchUserPoints]);
 
-    // Función para obtener los productos de canje
     useEffect(() => {
-        const fetchRedemptionProducts = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                const response = await axios.get('/products');
-                const redeemable = response.data.filter(p => p.puntos_canje !== null && p.puntos_canje > 0);
-                setRedemptionProducts(redeemable);
-            } catch (err) {
-                console.error('Error al cargar productos de canje:', err);
-                setError('No se pudieron cargar los productos disponibles para canje.');
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchRedemptionProducts();
-    }, []);
+    }, [fetchRedemptionProducts]);
 
-    // >>>>>>>>>>>>>>> NUEVA FUNCIÓN PARA MANEJAR EL CLIC EN CANJEAR <<<<<<<<<<<<<<<<
+    const handleAddProductClick = () => {
+        navigate('/products/add'); // Asumiendo que la ruta para añadir es la misma
+    };
+
+    const handleEditProductClick = (productId) => {
+        navigate(`/products/edit/${productId}`); // Asumiendo la misma ruta para editar
+    };
+
+    const handleDeleteProduct = async (productId) => {
+        if (window.confirm('¿Estás seguro de que quieres eliminar este producto de canje?')) {
+            try {
+                await axios.delete(`/products/${productId}`);
+                console.log(`Producto de canje con ID ${productId} eliminado.`);
+                fetchRedemptionProducts(); // Recargar la lista después de eliminar
+            } catch (err) {
+                console.error("Error al eliminar el producto de canje:", err);
+                setError("No se pudo eliminar el producto de canje. Intenta de nuevo.");
+            }
+        }
+    };
+
     const handleRedeemClick = (productName) => {
         if (isAuthenticated) {
-            // Redirigir al dashboard con un mensaje
-            navigate('/dashboard', { 
-                state: { 
+            navigate('/dashboard', {
+                state: {
                     message: `¡Excelente! Muestra tu código QR al vendedor para canjear "${productName}".`,
                     variant: 'success'
-                } 
+                }
             });
         } else {
-            // Si no está autenticado, redirigir al login
             navigate('/login', {
                 state: {
                     message: 'Inicia sesión para canjear puntos.',
@@ -96,7 +111,14 @@ const RedemptionProductsPage = () => {
 
     return (
         <Container className="my-5">
-            <h1 className="text-center mb-4 text-primary">Canje por Puntos</h1>
+            <div className="d-flex justify-content-between align-items-center mb-4">
+                <h1 className="text-primary">Canje por Puntos</h1>
+                {user && user.role === 'admin' && (
+                    <Button variant="success" onClick={handleAddProductClick}>
+                        + Añadir Producto de Canje
+                    </Button>
+                )}
+            </div>
             <p className="text-center text-muted mb-4">
                 ¡Aquí puedes ver los productos que puedes canjear con tus puntos!
             </p>
@@ -123,11 +145,11 @@ const RedemptionProductsPage = () => {
                         <Col key={product.id}>
                             <Card className="h-100 shadow-sm rounded-lg">
                                 {product.imagen_url ? (
-                                    <Card.Img 
-                                        variant="top" 
-                                        src={product.imagen_url} 
-                                        alt={product.nombre} 
-                                        style={{ height: '200px', objectFit: 'cover' }} 
+                                    <Card.Img
+                                        variant="top"
+                                        src={product.imagen_url}
+                                        alt={product.nombre}
+                                        style={{ height: '200px', objectFit: 'cover' }}
                                         onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/400x200/cccccc/000000?text=Sin+Imagen'; }}
                                     />
                                 ) : (
@@ -147,10 +169,9 @@ const RedemptionProductsPage = () => {
                                         </h5>
                                         {isAuthenticated && userPoints !== null && (
                                             product.puntos_canje <= userPoints ? (
-                                                // >>>>>>>>>>>>>>> BOTÓN HABILITADO Y CON REDIRECCIÓN <<<<<<<<<<<<<<<<
-                                                <Button 
-                                                    variant="success" 
-                                                    className="w-100" 
+                                                <Button
+                                                    variant="success"
+                                                    className="w-100"
                                                     onClick={() => handleRedeemClick(product.nombre)}
                                                 >
                                                     ¡Canjear Ahora!
@@ -165,6 +186,17 @@ const RedemptionProductsPage = () => {
                                             <Button variant="outline-secondary" className="w-100" disabled>
                                                 Inicia Sesión para Canjear
                                             </Button>
+                                        )}
+
+                                        {user && user.role === 'admin' && (
+                                            <div className="d-flex justify-content-between mt-3">
+                                                <Button variant="warning" size="sm" onClick={() => handleEditProductClick(product.id)} className="me-2 flex-grow-1">
+                                                    Editar
+                                                </Button>
+                                                <Button variant="danger" size="sm" onClick={() => handleDeleteProduct(product.id)} className="flex-grow-1">
+                                                    Eliminar
+                                                </Button>
+                                            </div>
                                         )}
                                     </div>
                                 </Card.Body>

@@ -14,12 +14,12 @@ const ProductAddPage = () => {
         precio: '',
         stock: '',
         unidad_de_medida: 'kg',
-        imagen_url: '',
         categoria: '',
         disponible: true,
-        // >>>>>>>>>>>>>>> NUEVO CAMPO: puntos_canje <<<<<<<<<<<<<<<<
         puntos_canje: '', 
     });
+    // Estado para el archivo de imagen que se va a subir
+    const [imageFile, setImageFile] = useState(null); 
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,11 +40,26 @@ const ProductAddPage = () => {
     }, [user, navigate, isAuthenticated, loadingAuth]);
 
     const handleChange = (e) => {
-        const { name, value, type, checked } = e.target;
-        setFormData({
-            ...formData,
-            [name]: type === 'checkbox' ? checked : value,
-        });
+        const { name, value, type, checked, files } = e.target;
+        // Si el input es de tipo 'file', maneja 'files[0]'
+        if (type === 'file') {
+            setImageFile(files[0]);
+        } else {
+            setFormData(prevData => {
+                const newData = {
+                    ...prevData,
+                    [name]: type === 'checkbox' ? checked : value,
+                };
+
+                // Lógica para limpiar precio o puntos_canje si el otro se está llenando
+                if (name === 'precio' && value !== '' && newData.puntos_canje !== '') {
+                    newData.puntos_canje = '';
+                } else if (name === 'puntos_canje' && value !== '' && newData.precio !== '') {
+                    newData.precio = '';
+                }
+                return newData;
+            });
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -53,19 +68,16 @@ const ProductAddPage = () => {
         setError('');
         setIsSubmitting(true);
 
-        // >>>>>>>>>>>>>>> CORRECCIÓN EN VALIDACIONES <<<<<<<<<<<<<<<<
-        // Validar que nombre y stock sean obligatorios (precio ya no se valida aquí)
-        if (!formData.nombre || !formData.stock) {
+        // Validaciones Frontend
+        if (!formData.nombre || formData.stock === '') { // stock es obligatorio, pero puede ser 0
             setError('Nombre y Stock son obligatorios.');
             setIsSubmitting(false);
             return;
         }
 
-        // Determinar si se ingresó precio o puntos de canje
         const hasPriceInput = formData.precio !== '' && formData.precio !== null;
         const hasPointsInput = formData.puntos_canje !== '' && formData.puntos_canje !== null;
 
-        // Validar que se ingrese uno y solo uno de los dos (precio o puntos)
         if (!hasPriceInput && !hasPointsInput) {
             setError('Debe ingresar un Precio o Puntos de Canje para el producto.');
             setIsSubmitting(false);
@@ -77,7 +89,6 @@ const ProductAddPage = () => {
             return;
         }
 
-        // Validar el precio si fue ingresado
         if (hasPriceInput) {
             const parsedPrice = parseFloat(formData.precio);
             if (isNaN(parsedPrice) || parsedPrice <= 0) {
@@ -87,49 +98,62 @@ const ProductAddPage = () => {
             }
         }
 
-        // Validar los puntos de canje si fueron ingresados
         if (hasPointsInput) {
             const parsedPoints = parseInt(formData.puntos_canje);
-            if (isNaN(parsedPoints) || parsedPoints < 0) { // Puntos pueden ser 0
+            if (isNaN(parsedPoints) || parsedPoints < 0) { 
                 setError('Los puntos de canje deben ser un número no negativo.');
                 setIsSubmitting(false);
                 return;
             }
         }
 
-        // Validar stock (lo muevo aquí abajo para que se ejecute después de las validaciones de precio/puntos)
         const parsedStock = parseInt(formData.stock);
         if (isNaN(parsedStock) || parsedStock < 0) {
             setError('El stock debe ser un número no negativo.');
             setIsSubmitting(false);
             return;
         }
-        // >>>>>>>>>>>>>>> FIN CORRECCIÓN EN VALIDACIONES <<<<<<<<<<<<<<<<
+
+        const dataToSend = new FormData();
+        // Adjuntamos todos los campos del formData, excepto los que se manejan diferente
+        for (const key in formData) {
+            if (key === 'precio') {
+                dataToSend.append(key, hasPriceInput ? parseFloat(formData.precio) : '');
+            } else if (key === 'puntos_canje') {
+                dataToSend.append(key, hasPointsInput ? parseInt(formData.puntos_canje) : '');
+            } else if (key === 'stock') {
+                dataToSend.append(key, parsedStock);
+            } else if (key === 'disponible') {
+                dataToSend.append(key, formData[key] ? 'true' : 'false'); // Envía booleanos como strings
+            }
+            else {
+                dataToSend.append(key, formData[key]);
+            }
+        }
+        
+        // Adjuntamos el archivo de imagen si existe
+        if (imageFile) {
+            dataToSend.append('imagen', imageFile); // 'imagen' es el nombre del campo que Multer espera
+        } 
+        // No necesitamos enviar 'imagen_url' como cadena vacía si no hay archivo,
+        // ya que el backend lo maneja como NULL por defecto si no hay un archivo 'imagen'.
 
         try {
-            const productData = {
-                ...formData,
-                // Asegurarse de enviar null si el campo está vacío o no es aplicable
-                precio: hasPriceInput ? parseFloat(formData.precio) : null,
-                puntos_canje: hasPointsInput ? parseInt(formData.puntos_canje) : null,
-                stock: parsedStock, // Ya validado y parseado
-            };
-
-            const response = await axios.post('/products', productData); 
+            const response = await axios.post('/products', dataToSend); 
             
             if (response.status === 201) {
                 setMessage('Producto añadido exitosamente!');
-                setFormData({ // Limpiar el formulario y resetear puntos_canje
+                setFormData({ // Restablecer el formulario
                     nombre: '',
                     descripcion: '',
                     precio: '',
                     stock: '',
                     unidad_de_medida: 'kg',
-                    imagen_url: '',
                     categoria: '',
                     disponible: true,
-                    puntos_canje: '', // Resetear también
+                    puntos_canje: '', 
                 });
+                setImageFile(null); // Limpia el archivo seleccionado
                 setTimeout(() => {
                     navigate('/products');
                 }, 1500); 
@@ -202,11 +226,9 @@ const ProductAddPage = () => {
                         onChange={handleChange}
                         step="0.01"
                         placeholder="Ej: 15.75"
-                        // Eliminamos 'required' aquí porque ahora es opcional si hay puntos_canje
                     />
                 </Form.Group>
 
-                {/* >>>>>>>>>>>>>>> NUEVO CAMPO: Puntos de Canje <<<<<<<<<<<<<<<< */}
                 <Form.Group className="mb-3" controlId="puntos_canje">
                     <Form.Label>Puntos de Canje (deja vacío si es por venta)</Form.Label>
                     <Form.Control
@@ -221,7 +243,6 @@ const ProductAddPage = () => {
                         Si este producto se canjea por puntos, ingresa el valor aquí y deja el precio vacío.
                     </Form.Text>
                 </Form.Group>
-                {/* >>>>>>>>>>>>>>> FIN NUEVO CAMPO <<<<<<<<<<<<<<<< */}
 
                 <Form.Group className="mb-3" controlId="stock">
                     <Form.Label>Stock</Form.Label>
@@ -249,15 +270,18 @@ const ProductAddPage = () => {
                     </Form.Select>
                 </Form.Group>
 
-                <Form.Group className="mb-3" controlId="imagen_url">
-                    <Form.Label>URL de la Imagen</Form.Label>
+                <Form.Group className="mb-3" controlId="imagen">
+                    <Form.Label>Imagen del Producto</Form.Label>
                     <Form.Control
-                        type="text"
-                        name="imagen_url"
-                        value={formData.imagen_url}
+                        type="file"
+                        name="imagen"
                         onChange={handleChange}
-                        placeholder="Ej: http://ejemplo.com/imagen.jpg"
+                        accept="image/*"
                     />
+                    {imageFile && <Form.Text className="text-muted">Archivo seleccionado: {imageFile.name}</Form.Text>}
+                    {/* Esta línea no debería ser necesaria para "añadir" si formData.imagen_url siempre es "" */}
+                    {/* {!imageFile && formData.imagen_url && 
+                        <Form.Text className="text-muted">URL actual (será reemplazada al subir nueva imagen): {formData.imagen_url}</Form.Text>} */}
                 </Form.Group>
 
                 <Form.Group className="mb-3" controlId="categoria">

@@ -7,6 +7,7 @@ const { Pool } = require('pg');
 const cors = require('cors');
 const passport = require('passport');
 const session = require('express-session');
+const path = require('path'); // <<<--- ¡NUEVO! Importa el módulo 'path'
 
 require('./config/passport'); // Configuración de Passport
 
@@ -29,11 +30,23 @@ const pool = new Pool({
 
 // Middleware
 app.use(cors({
-    // >>>>>>>>>>>>>>> VOLVEMOS A localhost <<<<<<<<<<<<<<<<
     origin: 'http://localhost:3000', // Asegúrate de que esta sea la URL de tu frontend
     credentials: true // Muy importante para las cookies de sesión de Passport
 }));
 app.use(express.json());
+// <<<--- ¡NUEVO! Para parsear datos de formularios URL-encoded, necesario para FormData sin archivos
+app.use(express.urlencoded({ extended: true })); 
+
+// =======================================================
+// === NUEVA CONFIGURACIÓN PARA SERVIR ARCHIVOS ESTATICOS ===
+// =======================================================
+// Esta línea hace que la carpeta 'carniceria-app/backend/uploads/imagenes'
+// sea accesible a través de la URL '/images'.
+// Por ejemplo, una imagen guardada como '12345-mi-producto.jpg' en
+// 'backend/uploads/imagenes/' se podrá acceder desde el frontend en:
+// 'http://localhost:5000/images/12345-mi-producto.jpg' (asumiendo puerto 5000)
+app.use('/images', express.static(path.join(__dirname, 'uploads', 'imagenes')));
+// =======================================================
 
 // Configuración de Sesiones para Passport
 app.use(session({
@@ -72,4 +85,6 @@ app.get('/db-test', async (req, res) => {
 // Iniciar el servidor
 app.listen(port, () => {
     console.log(`Servidor backend corriendo en http://localhost:${port}`);
+    // <<<--- ¡NUEVO! Mensaje para confirmar la URL de las imágenes
+    console.log(`Imágenes estáticas disponibles en http://localhost:${port}/images/`); 
 });
