@@ -2,17 +2,15 @@
 
 const express = require('express');
 const router = express.Router();
-// ¡IMPORTANTE! Eliminamos la línea 'const { Pool } = require('pg');' y la sección del pool de aquí.
 const { protect, authorizeRoles } = require('../middleware/authMiddleware'); 
 
-const multer = require('multer'); // Importa Multer
-const path = require('path');     // Importa 'path' para rutas
+const multer = require('multer');
+const path = require('path');
 
-const productController = require('../controllers/productController'); // Importa el controlador de productos
-
+const productController = require('../controllers/productController');
 
 // =======================================================
-// === CONFIGURACIÓN DE MULTER PARA ALMACENAMIENTO (ESTO SE QUEDA) ===
+// === CONFIGURACIÓN DE MULTER PARA ALMACENAMIENTO ===
 // =======================================================
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -45,7 +43,11 @@ const upload = multer({
 
 router.get('/', productController.getProducts);
 
-router.get('/:id', productController.getProductById);
+// AÑADIDO: console.log para confirmar que esta ruta específica se está ejecutando
+router.get('/:id', (req, res, next) => {
+    console.log(`productRoutes.js: Manejando GET para /:id. ID: ${req.params.id}`);
+    next(); // Pasa el control al controlador real
+}, productController.getProductById);
 
 // Añadir un producto (con subida de imagen)
 router.post('/', protect, authorizeRoles('admin'), upload.single('imagen'), productController.addProduct);

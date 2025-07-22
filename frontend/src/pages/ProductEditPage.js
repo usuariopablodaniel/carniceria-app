@@ -15,13 +15,12 @@ const ProductEditPage = () => {
         precio: '',
         stock: '',
         unidad_de_medida: 'kg',
-        imagen_url: '', // Mantenemos imagen_url en formData para mostrar la URL actual
+        imagen_url: '',
         categoria: '',
         disponible: true,
         puntos_canje: '',
     });
     const [imageFile, setImageFile] = useState(null); 
-    // Estado para la URL de previsualización de la nueva imagen o la existente
     const [imagePreviewUrl, setImagePreviewUrl] = useState(''); 
 
     const [loadingProduct, setLoadingProduct] = useState(true);
@@ -46,7 +45,15 @@ const ProductEditPage = () => {
 
         const fetchProduct = async () => {
             try {
-                const response = await axios.get(`/products/${id}`);
+                // Validación: Si el ID no es válido (ej. undefined, null, NaN), muestra un error.
+                if (!id || isNaN(Number(id))) { 
+                    setError('ID de producto no válido o no proporcionado para edición.');
+                    setLoadingProduct(false);
+                    return; 
+                }
+
+                const requestUrl = `/products/${id}`;
+                const response = await axios.get(requestUrl);
                 const productData = response.data;
                 setFormData({
                     nombre: productData.nombre || '',
@@ -54,18 +61,25 @@ const ProductEditPage = () => {
                     precio: productData.precio !== undefined && productData.precio !== null ? String(productData.precio) : '',
                     stock: productData.stock !== undefined && productData.stock !== null ? String(productData.stock) : '',
                     unidad_de_medida: productData.unidad_de_medida || 'kg',
-                    imagen_url: productData.imagen_url || '', // Carga la URL actual del producto
+                    imagen_url: productData.imagen_url || '',
                     categoria: productData.categoria || '',
                     disponible: productData.disponible !== undefined ? productData.disponible : true,
                     puntos_canje: productData.puntos_canje !== undefined && productData.puntos_canje !== null ? String(productData.puntos_canje) : '',
                 });
-                // También inicializa la URL de previsualización con la imagen existente
+                // Construir la URL completa para la previsualización de la imagen existente
                 if (productData.imagen_url) {
-                    setImagePreviewUrl(productData.imagen_url);
+                    const backendBaseUrl = axios.defaults.baseURL.replace('/api', '');
+                    setImagePreviewUrl(`${backendBaseUrl}${productData.imagen_url}`);
                 }
             } catch (err) {
                 console.error('Error al cargar el producto para edición:', err);
-                setError('No se pudo cargar el producto para edición. Verifica el ID.');
+                if (err.response) {
+                    setError(err.response.data.error || `Error al cargar el producto (Código: ${err.response.status}).`);
+                } else if (err.request) {
+                    setError('No se pudo conectar con el servidor. Verifica tu conexión.');
+                } else {
+                    setError('Ocurrió un error inesperado al procesar la solicitud.');
+                }
             } finally {
                 setLoadingProduct(false);
             }
@@ -73,33 +87,34 @@ const ProductEditPage = () => {
 
         fetchProduct();
 
-        // Limpiar la URL del objeto cuando el componente se desmonte o se seleccione una nueva imagen.
         return () => {
             if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
                 URL.revokeObjectURL(imagePreviewUrl);
             }
         };
 
-    }, [id, user, navigate, isAuthenticated, loadingAuth, imagePreviewUrl]); // Agregamos imagePreviewUrl a las dependencias para el cleanup
+    }, [id, user, navigate, isAuthenticated, loadingAuth, imagePreviewUrl]);
 
     const handleChange = (e) => {
         const { name, value, type, checked, files } = e.target;
         if (type === 'file') {
             const file = files[0];
             setImageFile(file);
-            // Crea una URL de objeto para previsualizar la nueva imagen
             if (file) {
-                // Si ya había una URL de objeto, revócala antes de crear una nueva
                 if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
                     URL.revokeObjectURL(imagePreviewUrl);
                 }
                 setImagePreviewUrl(URL.createObjectURL(file));
             } else {
-                // Si se deselecciona el archivo, revoca la URL del objeto y vuelve a la imagen_url existente o vacía
                 if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
                     URL.revokeObjectURL(imagePreviewUrl);
                 }
-                setImagePreviewUrl(formData.imagen_url || ''); 
+                if (formData.imagen_url) {
+                    const backendBaseUrl = axios.defaults.baseURL.replace('/api', '');
+                    setImagePreviewUrl(`${backendBaseUrl}${formData.imagen_url}`);
+                } else {
+                    setImagePreviewUrl('');
+                }
             }
         } else {
             setFormData(prevData => {
@@ -108,7 +123,6 @@ const ProductEditPage = () => {
                     [name]: type === 'checkbox' ? checked : value,
                 };
 
-                // Lógica para limpiar precio o puntos_canje si el otro se está llenando
                 if (name === 'precio' && value !== '' && newData.puntos_canje !== '') {
                     newData.puntos_canje = '';
                 } else if (name === 'puntos_canje' && value !== '' && newData.precio !== '') {
@@ -119,16 +133,13 @@ const ProductEditPage = () => {
         }
     };
 
-    // Función para manejar la eliminación explícita de la imagen actual
     const handleRemoveCurrentImage = () => {
-        // Establece imagen_url a vacío para indicar que se debe eliminar en el backend
-        // Esta señal se procesará en handleSubmit.
         setFormData(prevData => ({
             ...prevData,
             imagen_url: '' 
         }));
-        setImageFile(null); // Asegúrate de que no haya un archivo nuevo seleccionado
-        setImagePreviewUrl(''); // Limpia la previsualización
+        setImageFile(null);
+        setImagePreviewUrl('');
     };
 
     const handleSubmit = async (e) => {
@@ -137,7 +148,6 @@ const ProductEditPage = () => {
         setError('');
         setIsSubmitting(true);
 
-        // Validaciones Frontend (estas ya las tenías y están bien)
         if (!formData.nombre || formData.stock === '') {
             setError('Nombre y Stock son obligatorios.');
             setIsSubmitting(false);
@@ -185,50 +195,35 @@ const ProductEditPage = () => {
 
         const dataToSend = new FormData();
         for (const key in formData) {
-            // Solo adjuntamos los campos que queremos enviar como parte de la carga útil normal
-            // Los campos 'precio', 'puntos_canje', 'stock', 'disponible' se manejan explícitamente a continuación
-            // y 'imagen_url' se maneja por separado para la lógica de eliminación/reemplazo.
             if (['precio', 'puntos_canje', 'stock', 'disponible', 'imagen_url'].includes(key)) {
                 continue; 
             }
             dataToSend.append(key, formData[key]);
         }
 
-        // Adjuntar valores de tipo numérico y booleano (ajustando a string para FormData)
         dataToSend.append('precio', hasPriceInput ? parseFloat(formData.precio) : ''); 
         dataToSend.append('puntos_canje', hasPointsInput ? parseInt(formData.puntos_canje) : '');
         dataToSend.append('stock', parsedStock);
         dataToSend.append('disponible', formData.disponible ? 'true' : 'false');
 
-        // Lógica clave para la imagen:
         if (imageFile) {
-            // Si hay un nuevo archivo seleccionado, lo enviamos. Multer lo procesará.
             dataToSend.append('imagen', imageFile); 
         } else if (formData.imagen_url === '') {
-            // Si NO hay un nuevo archivo seleccionado, PERO formData.imagen_url está vacío,
-            // significa que el usuario hizo clic en "Eliminar Imagen Actual".
-            // Enviamos un flag al backend para que sepa que debe poner NULL y eliminar el archivo antiguo.
-            // La columna Multer "imagen" NO se envía en este caso.
             dataToSend.append('imagen_url_clear', 'true'); 
         }
-        // Si no hay imageFile Y formData.imagen_url NO está vacío,
-        // no se añade nada al FormData relacionado con la imagen.
-        // El backend interpretará esto como "no cambiar la imagen existente".
-
 
         try {
             const response = await axios.put(`/products/${id}`, dataToSend);
             
             if (response.status === 200) {
                 setMessage('Producto actualizado exitosamente!');
-                setImageFile(null); // Limpiar el archivo seleccionado después del éxito
-                // Opcional: Si el backend devuelve la nueva URL de la imagen, actualiza formData.imagen_url
-                // Esto es importante para que la previsualización se actualice si el usuario NO navega lejos.
+                setImageFile(null);
                 if (response.data.product && response.data.product.imagen_url !== undefined) {
+                    const backendBaseUrl = axios.defaults.baseURL.replace('/api', '');
+                    const newFullImageUrl = `${backendBaseUrl}${response.data.product.imagen_url}`;
                     setFormData(prevData => ({ ...prevData, imagen_url: response.data.product.imagen_url }));
-                    setImagePreviewUrl(response.data.product.imagen_url || '');
+                    setImagePreviewUrl(newFullImageUrl || '');
                 } else {
-                    // Si el backend no devuelve la URL o se borró, asegúrate de que el estado refleje la eliminación
                     setFormData(prevData => ({ ...prevData, imagen_url: '' }));
                     setImagePreviewUrl('');
                 }
@@ -284,7 +279,7 @@ const ProductEditPage = () => {
             {message && <Alert variant="success" onClose={() => setMessage('')} dismissible>{message}</Alert>}
             {error && <Alert variant="danger" onClose={() => setError('')} dismissible>{error}</Alert>}
 
-            <Form onSubmit={handleSubmit}>
+            <Form onSubmit={handleSubmit} encType="multipart/form-data"> 
                 <Form.Group className="mb-3" controlId="nombre">
                     <Form.Label>Nombre del Producto</Form.Label>
                     <Form.Control
@@ -379,7 +374,7 @@ const ProductEditPage = () => {
                             {!imageFile && formData.imagen_url && (
                                 <Form.Text className="text-muted d-block mt-1">Imagen actual (no se ha subido una nueva)</Form.Text>
                             )}
-                            {(formData.imagen_url || imageFile) && ( // Muestra el botón si hay una imagen actual o una seleccionada
+                            {(formData.imagen_url || imageFile) && (
                                 <Button 
                                     variant="outline-danger" 
                                     size="sm" 

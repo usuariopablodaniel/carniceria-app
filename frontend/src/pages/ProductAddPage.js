@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext'; // <--- RUTA CORREGIDA
 import { Container, Form, Button, Alert, Spinner } from 'react-bootstrap';
 import axios from '../api/axios';
 
@@ -18,7 +18,6 @@ const ProductAddPage = () => {
         disponible: true,
         puntos_canje: '', 
     });
-    // Estado para el archivo de imagen que se va a subir
     const [imageFile, setImageFile] = useState(null); 
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
@@ -41,7 +40,6 @@ const ProductAddPage = () => {
 
     const handleChange = (e) => {
         const { name, value, type, checked, files } = e.target;
-        // Si el input es de tipo 'file', maneja 'files[0]'
         if (type === 'file') {
             setImageFile(files[0]);
         } else {
@@ -51,7 +49,6 @@ const ProductAddPage = () => {
                     [name]: type === 'checkbox' ? checked : value,
                 };
 
-                // Lógica para limpiar precio o puntos_canje si el otro se está llenando
                 if (name === 'precio' && value !== '' && newData.puntos_canje !== '') {
                     newData.puntos_canje = '';
                 } else if (name === 'puntos_canje' && value !== '' && newData.precio !== '') {
@@ -69,7 +66,7 @@ const ProductAddPage = () => {
         setIsSubmitting(true);
 
         // Validaciones Frontend
-        if (!formData.nombre || formData.stock === '') { // stock es obligatorio, pero puede ser 0
+        if (!formData.nombre || formData.stock === '') {
             setError('Nombre y Stock son obligatorios.');
             setIsSubmitting(false);
             return;
@@ -115,7 +112,6 @@ const ProductAddPage = () => {
         }
 
         const dataToSend = new FormData();
-        // Adjuntamos todos los campos del formData, excepto los que se manejan diferente
         for (const key in formData) {
             if (key === 'precio') {
                 dataToSend.append(key, hasPriceInput ? parseFloat(formData.precio) : '');
@@ -124,26 +120,23 @@ const ProductAddPage = () => {
             } else if (key === 'stock') {
                 dataToSend.append(key, parsedStock);
             } else if (key === 'disponible') {
-                dataToSend.append(key, formData[key] ? 'true' : 'false'); // Envía booleanos como strings
+                dataToSend.append(key, formData[key] ? 'true' : 'false');
             }
             else {
                 dataToSend.append(key, formData[key]);
             }
         }
         
-        // Adjuntamos el archivo de imagen si existe
         if (imageFile) {
-            dataToSend.append('imagen', imageFile); // 'imagen' es el nombre del campo que Multer espera
+            dataToSend.append('imagen', imageFile);
         } 
-        // No necesitamos enviar 'imagen_url' como cadena vacía si no hay archivo,
-        // ya que el backend lo maneja como NULL por defecto si no hay un archivo 'imagen'.
 
         try {
             const response = await axios.post('/products', dataToSend); 
             
             if (response.status === 201) {
                 setMessage('Producto añadido exitosamente!');
-                setFormData({ // Restablecer el formulario
+                setFormData({
                     nombre: '',
                     descripcion: '',
                     precio: '',
@@ -153,7 +146,7 @@ const ProductAddPage = () => {
                     disponible: true,
                     puntos_canje: '', 
                 });
-                setImageFile(null); // Limpia el archivo seleccionado
+                setImageFile(null);
                 setTimeout(() => {
                     navigate('/products');
                 }, 1500); 
@@ -192,7 +185,7 @@ const ProductAddPage = () => {
             {message && <Alert variant="success" onClose={() => setMessage('')} dismissible>{message}</Alert>}
             {error && <Alert variant="danger" onClose={() => setError('')} dismissible>{error}</Alert>}
 
-            <Form onSubmit={handleSubmit}>
+            <Form onSubmit={handleSubmit} encType="multipart/form-data"> 
                 <Form.Group className="mb-3" controlId="nombre">
                     <Form.Label>Nombre del Producto</Form.Label>
                     <Form.Control
@@ -279,9 +272,6 @@ const ProductAddPage = () => {
                         accept="image/*"
                     />
                     {imageFile && <Form.Text className="text-muted">Archivo seleccionado: {imageFile.name}</Form.Text>}
-                    {/* Esta línea no debería ser necesaria para "añadir" si formData.imagen_url siempre es "" */}
-                    {/* {!imageFile && formData.imagen_url && 
-                        <Form.Text className="text-muted">URL actual (será reemplazada al subir nueva imagen): {formData.imagen_url}</Form.Text>} */}
                 </Form.Group>
 
                 <Form.Group className="mb-3" controlId="categoria">

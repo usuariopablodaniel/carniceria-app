@@ -60,6 +60,15 @@ const ProductListPage = () => {
     }
   };
 
+  // Función auxiliar para construir la URL completa de la imagen
+  const getFullImageUrl = (relativePath) => {
+    if (!relativePath) {
+      return null;
+    }
+    const backendBaseUrl = axios.defaults.baseURL.replace('/api', '');
+    return `${backendBaseUrl}${relativePath}`;
+  };
+
   if (error) {
     return (
       <Container className="my-5 d-flex justify-content-center">
@@ -74,7 +83,7 @@ const ProductListPage = () => {
   return (
     <Container className="my-5">
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h1 className="text-dark">Nuestras Ofertas y Productos en Venta</h1>
+        <h1 className="text-dark">Nuestras Ofertas y Productos en Venta</h1> 
         {user && user.role === 'admin' && (
           <Button variant="success" onClick={handleAddProductClick}>
             + Añadir Producto
@@ -123,7 +132,7 @@ const ProductListPage = () => {
                 {product.imagen_url ? (
                   <Card.Img
                     variant="top"
-                    src={product.imagen_url}
+                    src={getFullImageUrl(product.imagen_url)}
                     alt={product.nombre}
                     style={{ height: '200px', objectFit: 'cover' }}
                     onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/400x200/cccccc/000000?text=Sin+Imagen'; }}
@@ -139,9 +148,7 @@ const ProductListPage = () => {
                     {product.descripcion || 'Sin descripción.'}
                   </Card.Text>
                   <div className="mt-auto">
-                    {/* >>>>>>>>>>>>>>> LÍNEA CORREGIDA AQUÍ DE NUEVO <<<<<<<<<<<<<<<< */}
                     <h5 className="text-primary mb-2">
-                      {/* Convertir a número con parseFloat y luego formatear */}
                       ${product.precio !== null && product.precio !== undefined
                         ? parseFloat(product.precio).toFixed(2)
                         : 'N/A'

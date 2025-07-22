@@ -7,7 +7,7 @@ const { Pool } = require('pg');
 const cors = require('cors');
 const passport = require('passport');
 const session = require('express-session');
-const path = require('path'); // <<<--- ¡NUEVO! Importa el módulo 'path'
+const path = require('path');
 
 require('./config/passport'); // Configuración de Passport
 
@@ -16,7 +16,7 @@ const port = process.env.PORT || 5000;
 
 // *** Importaciones de Rutas ***
 const authRoutes = require('./routes/auth');
-const productRoutes = require('./routes/productRoutes');
+const productRoutes = require('./routes/productRoutes'); // <-- CORREGIDO: Eliminada la duplicación
 const transactionRoutes = require('./routes/transactionRoutes'); 
 
 // Configuración de la base de datos PostgreSQL
@@ -34,19 +34,7 @@ app.use(cors({
     credentials: true // Muy importante para las cookies de sesión de Passport
 }));
 app.use(express.json());
-// <<<--- ¡NUEVO! Para parsear datos de formularios URL-encoded, necesario para FormData sin archivos
 app.use(express.urlencoded({ extended: true })); 
-
-// =======================================================
-// === NUEVA CONFIGURACIÓN PARA SERVIR ARCHIVOS ESTATICOS ===
-// =======================================================
-// Esta línea hace que la carpeta 'carniceria-app/backend/uploads/imagenes'
-// sea accesible a través de la URL '/images'.
-// Por ejemplo, una imagen guardada como '12345-mi-producto.jpg' en
-// 'backend/uploads/imagenes/' se podrá acceder desde el frontend en:
-// 'http://localhost:5000/images/12345-mi-producto.jpg' (asumiendo puerto 5000)
-app.use('/images', express.static(path.join(__dirname, 'uploads', 'imagenes')));
-// =======================================================
 
 // Configuración de Sesiones para Passport
 app.use(session({
@@ -60,10 +48,21 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-// *** Uso de Rutas ***
-app.use('/api/auth', authRoutes); // Tus rutas de autenticación
-app.use('/api/products', productRoutes); // Tus rutas de productos
+// =======================================================
+// === USO DE RUTAS DE API ===
+// =======================================================
+app.use('/api/auth', authRoutes);
+app.use('/api/products', productRoutes); 
 app.use('/api/transactions', transactionRoutes); 
+// =======================================================
+
+// =======================================================
+// === CONFIGURACIÓN PARA SERVIR ARCHIVOS ESTATICOS ===
+// =======================================================
+// Esta línea hace que la carpeta 'carniceria-app/backend/uploads/imagenes'
+// sea accesible a través de la URL '/api/images'.
+app.use('/api/images', express.static(path.join(__dirname, 'uploads', 'imagenes'))); 
+// =======================================================
 
 // --- Rutas de Prueba para Verificar el Backend ---
 app.get('/', (req, res) => {
@@ -82,9 +81,20 @@ app.get('/db-test', async (req, res) => {
     }
 });
 
+// Middleware de manejo de errores centralizado (al final)
+app.use((err, req, res, next) => {
+    console.error('Error global de Express:', err.stack);
+    if (res.headersSent) {
+        return next(err);
+    }
+    res.status(err.statusCode || 500).json({
+        message: err.message || 'Error interno del servidor.',
+        error: process.env.NODE_ENV === 'development' ? err.stack : {}
+    });
+});
+
 // Iniciar el servidor
 app.listen(port, () => {
     console.log(`Servidor backend corriendo en http://localhost:${port}`);
-    // <<<--- ¡NUEVO! Mensaje para confirmar la URL de las imágenes
-    console.log(`Imágenes estáticas disponibles en http://localhost:${port}/images/`); 
+    console.log(`Imágenes estáticas disponibles en http://localhost:${port}/api/images/`); 
 });

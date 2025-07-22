@@ -3,11 +3,7 @@ import axios from 'axios';
 
 // Crea una instancia de Axios
 const api = axios.create({
-  // >>>>>>>>>>>>>>> VOLVEMOS A localhost <<<<<<<<<<<<<<<<
   baseURL: 'http://localhost:5000/api' , // Asegúrate de que esta sea la URL de tu backend
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 // Interceptor para añadir el token a cada solicitud saliente
@@ -19,6 +15,7 @@ api.interceptors.request.use(
       // Si el token existe, lo añade a la cabecera Authorization
       config.headers.Authorization = `Bearer ${token}`;
     }
+
     return config;
   },
   (error) => {
@@ -33,7 +30,6 @@ api.interceptors.response.use(
     // Si la respuesta es un error
     if (error.response) {
       const { status } = error.response;
-      // console.log('Error de respuesta de Axios:', status); // Para depuración
 
       // Manejar 401 Unauthorized (token inválido o expirado)
       if (status === 401) {
@@ -42,14 +38,11 @@ api.interceptors.response.use(
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         // Redirigir al usuario al login con un mensaje.
-        // Usar window.location.href para forzar una recarga completa y limpiar el estado de React.
         window.location.href = '/login?message=session_expired'; 
       }
       // Manejar 403 Forbidden (sin permisos)
       else if (status === 403) {
         console.warn('Acceso denegado. No tienes permisos para esta acción.');
-        // No hacemos logout, solo re-lanzamos el error para que el componente lo maneje
-        // Ej: puedes mostrar un mensaje de "Acceso Denegado" en el componente que hizo la llamada
       }
     }
     return Promise.reject(error); // Re-lanzar el error para que el componente que hizo la llamada lo maneje

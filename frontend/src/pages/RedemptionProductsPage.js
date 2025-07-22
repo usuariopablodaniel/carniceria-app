@@ -12,6 +12,17 @@ const RedemptionProductsPage = () => {
     const [error, setError] = useState(null);
     const [userPoints, setUserPoints] = useState(null);
 
+    // Función auxiliar para construir la URL completa de la imagen
+    // No necesita useCallback si no tiene dependencias reactivas,
+    // o se usa useCallback con un array de dependencias vacío para memoizarla.
+    const getFullImageUrl = (relativePath) => { // <-- Corregido aquí: Eliminado useCallback si no es estrictamente necesario o se usa correctamente.
+        if (!relativePath) {
+            return null;
+        }
+        const backendBaseUrl = axios.defaults.baseURL.replace('/api', '');
+        return `${backendBaseUrl}${relativePath}`;
+    };
+
     const fetchUserPoints = useCallback(async () => {
         if (!isAuthenticated || !user || !user.id) {
             setUserPoints(0);
@@ -24,7 +35,7 @@ const RedemptionProductsPage = () => {
             console.error('Error al obtener los puntos del usuario:', err);
             setUserPoints(null);
         }
-    }, [isAuthenticated, user]); // Dependencias para useCallback
+    }, [isAuthenticated, user]);
 
     const fetchRedemptionProducts = useCallback(async () => {
         setLoading(true);
@@ -39,7 +50,7 @@ const RedemptionProductsPage = () => {
         } finally {
             setLoading(false);
         }
-    }, []); // Dependencias para useCallback
+    }, []);
 
     useEffect(() => {
         if (!loadingAuth) {
@@ -52,11 +63,11 @@ const RedemptionProductsPage = () => {
     }, [fetchRedemptionProducts]);
 
     const handleAddProductClick = () => {
-        navigate('/products/add'); // Asumiendo que la ruta para añadir es la misma
+        navigate('/products/add');
     };
 
     const handleEditProductClick = (productId) => {
-        navigate(`/products/edit/${productId}`); // Asumiendo la misma ruta para editar
+        navigate(`/products/edit/${productId}`);
     };
 
     const handleDeleteProduct = async (productId) => {
@@ -147,7 +158,7 @@ const RedemptionProductsPage = () => {
                                 {product.imagen_url ? (
                                     <Card.Img
                                         variant="top"
-                                        src={product.imagen_url}
+                                        src={getFullImageUrl(product.imagen_url)}
                                         alt={product.nombre}
                                         style={{ height: '200px', objectFit: 'cover' }}
                                         onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/400x200/cccccc/000000?text=Sin+Imagen'; }}
