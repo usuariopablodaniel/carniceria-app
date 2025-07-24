@@ -23,7 +23,7 @@ const ProductEditPage = () => {
     const [imageFile, setImageFile] = useState(null); 
     const [imagePreviewUrl, setImagePreviewUrl] = useState(''); 
 
-    const [loadingProduct, setLoadingProduct] = useState(true);
+    const [loadingProduct, setLoadingProduct] = useState(true); 
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,7 +45,6 @@ const ProductEditPage = () => {
 
         const fetchProduct = async () => {
             try {
-                // Validación: Si el ID no es válido (ej. undefined, null, NaN), muestra un error.
                 if (!id || isNaN(Number(id))) { 
                     setError('ID de producto no válido o no proporcionado para edición.');
                     setLoadingProduct(false);
@@ -66,10 +65,11 @@ const ProductEditPage = () => {
                     disponible: productData.disponible !== undefined ? productData.disponible : true,
                     puntos_canje: productData.puntos_canje !== undefined && productData.puntos_canje !== null ? String(productData.puntos_canje) : '',
                 });
-                // Construir la URL completa para la previsualización de la imagen existente
                 if (productData.imagen_url) {
                     const backendBaseUrl = axios.defaults.baseURL.replace('/api', '');
                     setImagePreviewUrl(`${backendBaseUrl}${productData.imagen_url}`);
+                } else {
+                    setImagePreviewUrl(''); // Asegurarse de limpiar si no hay imagen
                 }
             } catch (err) {
                 console.error('Error al cargar el producto para edición:', err);
@@ -88,27 +88,32 @@ const ProductEditPage = () => {
         fetchProduct();
 
         return () => {
+            // Limpiar la URL de objeto blob cuando el componente se desmonte
             if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
                 URL.revokeObjectURL(imagePreviewUrl);
             }
         };
 
-    }, [id, user, navigate, isAuthenticated, loadingAuth, imagePreviewUrl]);
+    }, [id, user, navigate, isAuthenticated, loadingAuth, imagePreviewUrl]); // Mantener imagePreviewUrl en dependencias por la función de limpieza
 
     const handleChange = (e) => {
         const { name, value, type, checked, files } = e.target;
         if (type === 'file') {
             const file = files[0];
             setImageFile(file);
+            console.log('FRONTEND DEBUG: handleChange - Archivo seleccionado:', file); 
             if (file) {
+                // Revocar la URL de objeto blob anterior si existe
                 if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
                     URL.revokeObjectURL(imagePreviewUrl);
                 }
-                setImagePreviewUrl(URL.createObjectURL(file));
+                setImagePreviewUrl(URL.createObjectURL(file)); // Crea una nueva URL de objeto blob para previsualización
             } else {
+                // Si el input de archivo se vacía, restablecer la previsualización
                 if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
                     URL.revokeObjectURL(imagePreviewUrl);
                 }
+                // Si había una imagen_url en formData, volver a esa. Si no, limpiar.
                 if (formData.imagen_url) {
                     const backendBaseUrl = axios.defaults.baseURL.replace('/api', '');
                     setImagePreviewUrl(`${backendBaseUrl}${formData.imagen_url}`);
@@ -136,10 +141,11 @@ const ProductEditPage = () => {
     const handleRemoveCurrentImage = () => {
         setFormData(prevData => ({
             ...prevData,
-            imagen_url: '' 
+            imagen_url: '' // Establece la URL de la imagen en el formData a vacío para indicar al backend que la elimine
         }));
-        setImageFile(null);
-        setImagePreviewUrl('');
+        setImageFile(null); // Limpia el archivo seleccionado en el input file
+        setImagePreviewUrl(''); // Limpia la previsualización
+        console.log('FRONTEND DEBUG: handleRemoveCurrentImage - Imagen actual eliminada.'); 
     };
 
     const handleSubmit = async (e) => {
@@ -147,6 +153,9 @@ const ProductEditPage = () => {
         setMessage('');
         setError('');
         setIsSubmitting(true);
+
+        console.log('FRONTEND DEBUG: handleSubmit - Iniciando envío del formulario.'); 
+        console.log('FRONTEND DEBUG: handleSubmit - Valor de imageFile antes de FormData:', imageFile); 
 
         if (!formData.nombre || formData.stock === '') {
             setError('Nombre y Stock son obligatorios.');
@@ -195,21 +204,34 @@ const ProductEditPage = () => {
 
         const dataToSend = new FormData();
         for (const key in formData) {
+            // Excluir estos campos para manejarlos específicamente
             if (['precio', 'puntos_canje', 'stock', 'disponible', 'imagen_url'].includes(key)) {
                 continue; 
             }
             dataToSend.append(key, formData[key]);
         }
 
+        // Añadir los campos numéricos y booleanos convertidos
         dataToSend.append('precio', hasPriceInput ? parseFloat(formData.precio) : ''); 
         dataToSend.append('puntos_canje', hasPointsInput ? parseInt(formData.puntos_canje) : '');
         dataToSend.append('stock', parsedStock);
         dataToSend.append('disponible', formData.disponible ? 'true' : 'false');
 
+        // Manejo de la imagen
         if (imageFile) {
             dataToSend.append('imagen', imageFile); 
-        } else if (formData.imagen_url === '') {
+            console.log('FRONTEND DEBUG: handleSubmit - Añadiendo imageFile a FormData:', imageFile.name); 
+            // NO limpiamos imageFile aquí para ver si el flicker se reduce al limpiarlo después del éxito
+        } else if (formData.imagen_url === '') { // Si la URL en formData está vacía (por handleRemoveCurrentImage)
             dataToSend.append('imagen_url_clear', 'true'); 
+            console.log('FRONTEND DEBUG: handleSubmit - Solicitud para limpiar imagen actual.'); 
+        } else {
+            console.log('FRONTEND DEBUG: handleSubmit - No se seleccionó nueva imagen ni se solicitó limpiar la actual.'); 
+        }
+
+        // Depuración: Ver el contenido de FormData (no se puede ver directamente, pero podemos iterar)
+        for (let pair of dataToSend.entries()) {
+            console.log(pair[0]+ ', ' + pair[1]); 
         }
 
         try {
@@ -217,7 +239,8 @@ const ProductEditPage = () => {
             
             if (response.status === 200) {
                 setMessage('Producto actualizado exitosamente!');
-                setImageFile(null);
+                // Limpiar imageFile y actualizar la previsualización DESPUÉS del éxito
+                setImageFile(null); // <-- LIMPIAMOS AQUÍ DESPUÉS DEL ÉXITO
                 if (response.data.product && response.data.product.imagen_url !== undefined) {
                     const backendBaseUrl = axios.defaults.baseURL.replace('/api', '');
                     const newFullImageUrl = `${backendBaseUrl}${response.data.product.imagen_url}`;
@@ -227,6 +250,7 @@ const ProductEditPage = () => {
                     setFormData(prevData => ({ ...prevData, imagen_url: '' }));
                     setImagePreviewUrl('');
                 }
+                // Redirigir después de un breve retraso
                 setTimeout(() => {
                     navigate('/products');
                 }, 1500); 
