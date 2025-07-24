@@ -16,7 +16,7 @@ const ProductEditPage = () => {
         stock: '',
         unidad_de_medida: 'kg',
         imagen_url: '',
-        categoria: '',
+        categoria: '', // Valor inicial vacío para que el placeholder sea la primera opción
         disponible: true,
         puntos_canje: '',
     });
@@ -27,6 +27,9 @@ const ProductEditPage = () => {
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Definir las categorías disponibles
+    const categories = ["Ternera", "Pollo", "Cerdo", "Pescado"];
 
     useEffect(() => {
         if (loadingAuth) {
@@ -61,7 +64,7 @@ const ProductEditPage = () => {
                     stock: productData.stock !== undefined && productData.stock !== null ? String(productData.stock) : '',
                     unidad_de_medida: productData.unidad_de_medida || 'kg',
                     imagen_url: productData.imagen_url || '',
-                    categoria: productData.categoria || '',
+                    categoria: productData.categoria || '', // Asegurarse de que la categoría existente se cargue
                     disponible: productData.disponible !== undefined ? productData.disponible : true,
                     puntos_canje: productData.puntos_canje !== undefined && productData.puntos_canje !== null ? String(productData.puntos_canje) : '',
                 });
@@ -69,7 +72,7 @@ const ProductEditPage = () => {
                     const backendBaseUrl = axios.defaults.baseURL.replace('/api', '');
                     setImagePreviewUrl(`${backendBaseUrl}${productData.imagen_url}`);
                 } else {
-                    setImagePreviewUrl(''); // Asegurarse de limpiar si no hay imagen
+                    setImagePreviewUrl('');
                 }
             } catch (err) {
                 console.error('Error al cargar el producto para edición:', err);
@@ -88,13 +91,12 @@ const ProductEditPage = () => {
         fetchProduct();
 
         return () => {
-            // Limpiar la URL de objeto blob cuando el componente se desmonte
             if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
                 URL.revokeObjectURL(imagePreviewUrl);
             }
         };
 
-    }, [id, user, navigate, isAuthenticated, loadingAuth, imagePreviewUrl]); // Mantener imagePreviewUrl en dependencias por la función de limpieza
+    }, [id, user, navigate, isAuthenticated, loadingAuth, imagePreviewUrl]);
 
     const handleChange = (e) => {
         const { name, value, type, checked, files } = e.target;
@@ -103,17 +105,14 @@ const ProductEditPage = () => {
             setImageFile(file);
             console.log('FRONTEND DEBUG: handleChange - Archivo seleccionado:', file); 
             if (file) {
-                // Revocar la URL de objeto blob anterior si existe
                 if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
                     URL.revokeObjectURL(imagePreviewUrl);
                 }
-                setImagePreviewUrl(URL.createObjectURL(file)); // Crea una nueva URL de objeto blob para previsualización
+                setImagePreviewUrl(URL.createObjectURL(file));
             } else {
-                // Si el input de archivo se vacía, restablecer la previsualización
                 if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
                     URL.revokeObjectURL(imagePreviewUrl);
                 }
-                // Si había una imagen_url en formData, volver a esa. Si no, limpiar.
                 if (formData.imagen_url) {
                     const backendBaseUrl = axios.defaults.baseURL.replace('/api', '');
                     setImagePreviewUrl(`${backendBaseUrl}${formData.imagen_url}`);
@@ -141,10 +140,10 @@ const ProductEditPage = () => {
     const handleRemoveCurrentImage = () => {
         setFormData(prevData => ({
             ...prevData,
-            imagen_url: '' // Establece la URL de la imagen en el formData a vacío para indicar al backend que la elimine
+            imagen_url: '' 
         }));
-        setImageFile(null); // Limpia el archivo seleccionado en el input file
-        setImagePreviewUrl(''); // Limpia la previsualización
+        setImageFile(null);
+        setImagePreviewUrl('');
         console.log('FRONTEND DEBUG: handleRemoveCurrentImage - Imagen actual eliminada.'); 
     };
 
@@ -202,34 +201,37 @@ const ProductEditPage = () => {
             return;
         }
 
+        // Validación para la categoría: debe ser seleccionada
+        if (!formData.categoria || formData.categoria === '') {
+            setError('Debe seleccionar una categoría para el producto.');
+            setIsSubmitting(false);
+            return;
+        }
+
         const dataToSend = new FormData();
         for (const key in formData) {
-            // Excluir estos campos para manejarlos específicamente
             if (['precio', 'puntos_canje', 'stock', 'disponible', 'imagen_url'].includes(key)) {
                 continue; 
             }
             dataToSend.append(key, formData[key]);
         }
 
-        // Añadir los campos numéricos y booleanos convertidos
         dataToSend.append('precio', hasPriceInput ? parseFloat(formData.precio) : ''); 
         dataToSend.append('puntos_canje', hasPointsInput ? parseInt(formData.puntos_canje) : '');
         dataToSend.append('stock', parsedStock);
         dataToSend.append('disponible', formData.disponible ? 'true' : 'false');
 
-        // Manejo de la imagen
         if (imageFile) {
             dataToSend.append('imagen', imageFile); 
             console.log('FRONTEND DEBUG: handleSubmit - Añadiendo imageFile a FormData:', imageFile.name); 
-            // NO limpiamos imageFile aquí para ver si el flicker se reduce al limpiarlo después del éxito
-        } else if (formData.imagen_url === '') { // Si la URL en formData está vacía (por handleRemoveCurrentImage)
+            setImageFile(null); 
+        } else if (formData.imagen_url === '') { 
             dataToSend.append('imagen_url_clear', 'true'); 
             console.log('FRONTEND DEBUG: handleSubmit - Solicitud para limpiar imagen actual.'); 
         } else {
             console.log('FRONTEND DEBUG: handleSubmit - No se seleccionó nueva imagen ni se solicitó limpiar la actual.'); 
         }
 
-        // Depuración: Ver el contenido de FormData (no se puede ver directamente, pero podemos iterar)
         for (let pair of dataToSend.entries()) {
             console.log(pair[0]+ ', ' + pair[1]); 
         }
@@ -239,8 +241,7 @@ const ProductEditPage = () => {
             
             if (response.status === 200) {
                 setMessage('Producto actualizado exitosamente!');
-                // Limpiar imageFile y actualizar la previsualización DESPUÉS del éxito
-                setImageFile(null); // <-- LIMPIAMOS AQUÍ DESPUÉS DEL ÉXITO
+                setImageFile(null); 
                 if (response.data.product && response.data.product.imagen_url !== undefined) {
                     const backendBaseUrl = axios.defaults.baseURL.replace('/api', '');
                     const newFullImageUrl = `${backendBaseUrl}${response.data.product.imagen_url}`;
@@ -250,7 +251,6 @@ const ProductEditPage = () => {
                     setFormData(prevData => ({ ...prevData, imagen_url: '' }));
                     setImagePreviewUrl('');
                 }
-                // Redirigir después de un breve retraso
                 setTimeout(() => {
                     navigate('/products');
                 }, 1500); 
@@ -385,14 +385,14 @@ const ProductEditPage = () => {
                         onChange={handleChange}
                         accept="image/*"
                     />
-                    {/* Previsualización de la imagen nueva o existente */}
                     {imagePreviewUrl && (
                         <div className="mt-2 text-center">
                             <p className="text-muted mb-1">Previsualización:</p>
                             <img 
                                 src={imagePreviewUrl} 
                                 alt="Previsualización del producto" 
-                                style={{ maxWidth: '200px', maxHeight: '200px', objectFit: 'contain', border: '1px solid #ddd', borderRadius: '4px' }} 
+                                style={{ width: '100%', maxWidth: '200px', height: 'auto', maxHeight: '200px', objectFit: 'contain', border: '1px solid #ddd', borderRadius: '4px' }} 
+                                loading="lazy" 
                             />
                             {imageFile && <Form.Text className="text-muted d-block mt-1">Archivo seleccionado: {imageFile.name}</Form.Text>}
                             {!imageFile && formData.imagen_url && (
@@ -419,12 +419,20 @@ const ProductEditPage = () => {
 
                 <Form.Group className="mb-3" controlId="categoria">
                     <Form.Label>Categoría</Form.Label>
-                    <Form.Control
-                        type="text"
+                    <Form.Select
                         name="categoria"
                         value={formData.categoria}
                         onChange={handleChange}
-                    />
+                        required // Hacer que la selección de categoría sea obligatoria
+                    >
+                        <option value="">-- Selecciona una categoría --</option> {/* Opción por defecto */}
+                        {categories.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                    </Form.Select>
+                    <Form.Text className="text-muted">
+                        Selecciona la categoría principal del producto.
+                    </Form.Text>
                 </Form.Group>
 
                 <Form.Group className="mb-3" controlId="disponible">

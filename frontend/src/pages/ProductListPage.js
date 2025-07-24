@@ -16,6 +16,7 @@ const ProductListPage = () => {
     setError(null);
     try {
       const response = await axios.get('/products');
+      // Filtra solo los productos que tienen precio y no puntos de canje
       const saleProducts = response.data.filter(product =>
         product.precio !== null && product.precio !== undefined &&
         (product.puntos_canje === null || product.puntos_canje === undefined)
@@ -33,11 +34,11 @@ const ProductListPage = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, []); // Dependencia vacía para useCallback, ya que no depende de nada que cambie fuera de su scope.
 
   useEffect(() => {
     fetchProducts();
-  }, [fetchProducts]);
+  }, [fetchProducts]); // fetchProducts es una dependencia estable gracias a useCallback
 
   const handleAddProductClick = () => {
     navigate('/products/add');
@@ -48,6 +49,8 @@ const ProductListPage = () => {
   };
 
   const handleDeleteProduct = async (productId) => {
+    // Usar un modal personalizado en lugar de window.confirm en un entorno real
+    // Para esta demostración, window.confirm es aceptable.
     if (window.confirm('¿Estás seguro de que quieres eliminar este producto?')) {
       try {
         await axios.delete(`/products/${productId}`);
@@ -65,6 +68,8 @@ const ProductListPage = () => {
     if (!relativePath) {
       return null;
     }
+    // axios.defaults.baseURL es 'http://localhost:5000/api'
+    // Necesitamos 'http://localhost:5000' para las imágenes
     const backendBaseUrl = axios.defaults.baseURL.replace('/api', '');
     return `${backendBaseUrl}${relativePath}`;
   };
@@ -134,7 +139,10 @@ const ProductListPage = () => {
                     variant="top"
                     src={getFullImageUrl(product.imagen_url)}
                     alt={product.nombre}
-                    style={{ height: '200px', objectFit: 'cover' }}
+                    // --- INICIO DE CAMBIOS PARA OPTIMIZACIÓN DE IMAGEN ---
+                    style={{ height: '200px', width: '100%', objectFit: 'cover' }} // Asegura que ocupe el 100% del ancho
+                    loading="lazy" // Habilita la carga diferida para mejorar el rendimiento
+                    // --- FIN DE CAMBIOS PARA OPTIMIZACIÓN DE IMAGEN ---
                     onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/400x200/cccccc/000000?text=Sin+Imagen'; }}
                   />
                 ) : (

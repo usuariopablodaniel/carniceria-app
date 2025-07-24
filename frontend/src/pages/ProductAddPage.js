@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext'; // <--- RUTA CORREGIDA
+import { useAuth } from '../context/AuthContext';
 import { Container, Form, Button, Alert, Spinner } from 'react-bootstrap';
 import axios from '../api/axios';
 
@@ -14,14 +14,19 @@ const ProductAddPage = () => {
         precio: '',
         stock: '',
         unidad_de_medida: 'kg',
-        categoria: '',
+        imagen_url: '', 
+        categoria: '', // Valor inicial vacío para que el placeholder sea la primera opción
         disponible: true,
         puntos_canje: '', 
     });
     const [imageFile, setImageFile] = useState(null); 
+    const [imagePreviewUrl, setImagePreviewUrl] = useState(''); 
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Definir las categorías disponibles
+    const categories = ["Ternera", "Pollo", "Cerdo", "Pescado"];
 
     useEffect(() => {
         if (loadingAuth) {
@@ -36,12 +41,30 @@ const ProductAddPage = () => {
         if (user && user.role !== 'admin') {
             navigate('/dashboard', { replace: true });
         }
-    }, [user, navigate, isAuthenticated, loadingAuth]);
+
+        return () => {
+            if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(imagePreviewUrl);
+            }
+        };
+    }, [user, navigate, isAuthenticated, loadingAuth, imagePreviewUrl]);
 
     const handleChange = (e) => {
         const { name, value, type, checked, files } = e.target;
         if (type === 'file') {
-            setImageFile(files[0]);
+            const file = files[0];
+            setImageFile(file);
+            if (file) {
+                if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
+                    URL.revokeObjectURL(imagePreviewUrl);
+                }
+                setImagePreviewUrl(URL.createObjectURL(file));
+            } else {
+                if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
+                    URL.revokeObjectURL(imagePreviewUrl);
+                }
+                setImagePreviewUrl('');
+            }
         } else {
             setFormData(prevData => {
                 const newData = {
@@ -110,22 +133,26 @@ const ProductAddPage = () => {
             setIsSubmitting(false);
             return;
         }
+        
+        // Validación para la categoría: debe ser seleccionada
+        if (!formData.categoria || formData.categoria === '') {
+            setError('Debe seleccionar una categoría para el producto.');
+            setIsSubmitting(false);
+            return;
+        }
 
         const dataToSend = new FormData();
         for (const key in formData) {
-            if (key === 'precio') {
-                dataToSend.append(key, hasPriceInput ? parseFloat(formData.precio) : '');
-            } else if (key === 'puntos_canje') {
-                dataToSend.append(key, hasPointsInput ? parseInt(formData.puntos_canje) : '');
-            } else if (key === 'stock') {
-                dataToSend.append(key, parsedStock);
-            } else if (key === 'disponible') {
-                dataToSend.append(key, formData[key] ? 'true' : 'false');
+            if (['precio', 'puntos_canje', 'stock', 'disponible', 'imagen_url'].includes(key)) {
+                continue; 
             }
-            else {
-                dataToSend.append(key, formData[key]);
-            }
+            dataToSend.append(key, formData[key]);
         }
+        
+        dataToSend.append('precio', hasPriceInput ? parseFloat(formData.precio) : ''); 
+        dataToSend.append('puntos_canje', hasPointsInput ? parseInt(formData.puntos_canje) : '');
+        dataToSend.append('stock', parsedStock);
+        dataToSend.append('disponible', formData.disponible ? 'true' : 'false');
         
         if (imageFile) {
             dataToSend.append('imagen', imageFile);
@@ -142,11 +169,12 @@ const ProductAddPage = () => {
                     precio: '',
                     stock: '',
                     unidad_de_medida: 'kg',
-                    categoria: '',
+                    categoria: '', // Restablecer a vacío para el placeholder
                     disponible: true,
                     puntos_canje: '', 
                 });
                 setImageFile(null);
+                setImagePreviewUrl('');
                 setTimeout(() => {
                     navigate('/products');
                 }, 1500); 
@@ -271,18 +299,41 @@ const ProductAddPage = () => {
                         onChange={handleChange}
                         accept="image/*"
                     />
-                    {imageFile && <Form.Text className="text-muted">Archivo seleccionado: {imageFile.name}</Form.Text>}
+                    {imagePreviewUrl && (
+                        <div className="mt-2 text-center">
+                            <p className="text-muted mb-1">Previsualización:</p>
+                            <img 
+                                src={imagePreviewUrl} 
+                                alt="Previsualización del producto" 
+                                style={{ width: '100%', maxWidth: '200px', height: 'auto', maxHeight: '200px', objectFit: 'contain', border: '1px solid #ddd', borderRadius: '4px' }} 
+                                loading="lazy" 
+                            />
+                            {imageFile && <Form.Text className="text-muted d-block mt-1">Archivo seleccionado: {imageFile.name}</Form.Text>}
+                        </div>
+                    )}
+                    {!imagePreviewUrl && (
+                        <Form.Text className="text-muted d-block mt-1">
+                            No hay imagen seleccionada.
+                        </Form.Text>
+                    )}
                 </Form.Group>
 
                 <Form.Group className="mb-3" controlId="categoria">
                     <Form.Label>Categoría</Form.Label>
-                    <Form.Control
-                        type="text"
+                    <Form.Select
                         name="categoria"
                         value={formData.categoria}
                         onChange={handleChange}
-                        placeholder="Ej: Carnes Rojas, Pollo, Embutidos"
-                    />
+                        required // Hacer que la selección de categoría sea obligatoria
+                    >
+                        <option value="">-- Selecciona una categoría --</option> {/* Opción por defecto */}
+                        {categories.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                    </Form.Select>
+                    <Form.Text className="text-muted">
+                        Selecciona la categoría principal del producto.
+                    </Form.Text>
                 </Form.Group>
 
                 <Form.Group className="mb-3" controlId="disponible">
