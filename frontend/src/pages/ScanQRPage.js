@@ -1,5 +1,5 @@
 // frontend/src/pages/ScanQRPage.js
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Container, Form, Button, Alert, Spinner, Card, Row, Col } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -18,6 +18,7 @@ const ScanQRPage = () => {
     const [isProcessingRedemption, setIsProcessingRedemption] = useState(false);
     const [scannedUserName, setScannedUserName] = useState('');
 
+    // Controla si el componente Html5QrcodePlugin debe montarse/desmontarse
     const [scannerActive, setScannerActive] = useState(true); 
 
     const [redemptionProducts, setRedemptionProducts] = useState([]);
@@ -61,12 +62,12 @@ const ScanQRPage = () => {
         fetchRedemptionProducts();
     }, []);
 
-    // Función que se llama cuando se escanea un QR
-    const onNewScanResult = async (decodedText, decodedResult) => {
+    // Función que se llama cuando se escanea un QR, memoizada con useCallback
+    const onNewScanResult = useCallback(async (decodedText, decodedResult) => {
         console.log(`ScanQRPage: QR Code scanned = ${decodedText}`);
-        // Pausar el escáner temporalmente
+        // Desmontar el escáner inmediatamente
         setScannerActive(false); 
-        console.log("ScanQRPage: Escáner pausado.");
+        console.log("ScanQRPage: Escáner pausado (componente desmontado).");
 
         setMessage('');
         setError('');
@@ -84,7 +85,6 @@ const ScanQRPage = () => {
             const response = await axios.get(`/auth/user/${decodedText}`); 
             console.log("ScanQRPage: Respuesta de /auth/user/:id:", response.data);
             if (response.data && response.data.user) {
-                // Asegúrate de que 'nombre' sea la propiedad correcta en tu backend
                 setScannedUserName(response.data.user.nombre || response.data.user.name || `ID: ${decodedText}`);
                 console.log("ScanQRPage: Nombre de usuario escaneado:", response.data.user.nombre || response.data.user.name);
             } else {
@@ -99,7 +99,7 @@ const ScanQRPage = () => {
         if (amountInputRef.current) {
             amountInputRef.current.focus();
         }
-    };
+    }, [setScannerActive, setScannedUserId, setScannedUserName, setMessage, setError, setRedemptionError, setAmount, setSelectedRedemptionProduct, setSelectedRedemptionPoints, amountInputRef]);
 
     const handleRegisterPurchase = async (e) => {
         e.preventDefault();
@@ -129,9 +129,9 @@ const ScanQRPage = () => {
             if (response.status === 200) {
                 setMessage(response.data.message + ` Nuevos puntos: ${response.data.newPoints}`);
                 setAmount('');
-                setScannedUserId(null); // Limpiar el ID escaneado para una nueva transacción
+                setScannedUserId(null); 
                 setScannedUserName('');
-                console.log("ScanQRPage: Compra registrada con éxito. Reactivando escáner.");
+                console.log("ScanQRPage: Compra registrada con éxito.");
             } else {
                 setError(response.data.error || 'Error desconocido al registrar la compra.');
                 console.error("ScanQRPage: Error al registrar compra (respuesta no 200):", response.data);
@@ -145,8 +145,11 @@ const ScanQRPage = () => {
             }
         } finally {
             setIsProcessingPurchase(false);
-            setScannerActive(true); // Siempre reactivar el escáner al finalizar el proceso
-            console.log("ScanQRPage: Proceso de compra finalizado. Escáner reactivado.");
+            // Introduce un pequeño retraso antes de volver a montar el escáner
+            setTimeout(() => {
+                setScannerActive(true); 
+                console.log("ScanQRPage: Proceso de compra finalizado. Escáner reactivado después de retraso.");
+            }, 500); // 500ms de retraso
         }
     };
 
@@ -181,9 +184,9 @@ const ScanQRPage = () => {
                 setMessage(response.data.message + ` Puntos restantes: ${response.data.newPoints}`);
                 setSelectedRedemptionProduct('');
                 setSelectedRedemptionPoints(0);
-                setScannedUserId(null); // Limpiar ID escaneado
+                setScannedUserId(null); 
                 setScannedUserName('');
-                console.log("ScanQRPage: Canje registrado con éxito. Reactivando escáner.");
+                console.log("ScanQRPage: Canje registrado con éxito.");
             } else {
                 setRedemptionError(response.data.error || 'Error desconocido al registrar el canje.');
                 console.error("ScanQRPage: Error al registrar canje (respuesta no 200):", response.data);
@@ -197,8 +200,11 @@ const ScanQRPage = () => {
             }
         } finally {
             setIsProcessingRedemption(false);
-            setScannerActive(true); // Siempre reactivar el escáner al finalizar el proceso
-            console.log("ScanQRPage: Proceso de canje finalizado. Escáner reactivado.");
+            // Introduce un pequeño retraso antes de volver a montar el escáner
+            setTimeout(() => {
+                setScannerActive(true); 
+                console.log("ScanQRPage: Proceso de canje finalizado. Escáner reactivado después de retraso.");
+            }, 500); // 500ms de retraso
         }
     };
 
@@ -212,6 +218,20 @@ const ScanQRPage = () => {
             setSelectedRedemptionPoints(0);
         }
     };
+
+    const activateScanner = () => {
+        setScannerActive(true);
+        setScannedUserId(null); 
+        setScannedUserName('');
+        setAmount('');
+        setSelectedRedemptionProduct('');
+        setSelectedRedemptionPoints(0);
+        setMessage('');
+        setError('');
+        setRedemptionError('');
+        console.log("ScanQRPage: Botón 'Activar Escáner' presionado. Escáner reactivado y campos limpiados.");
+    };
+
 
     if (loadingAuth || !isAuthenticated || (user && user.role !== 'admin' && user.role !== 'employee')) {
         return (
@@ -236,23 +256,31 @@ const ScanQRPage = () => {
                 <Col md={6}>
                     <Card className="p-3 h-100">
                         <Card.Title className="text-center mb-3">Lector de QR</Card.Title>
+                        {/* Renderizar Html5QrcodePlugin solo cuando scannerActive es true */}
                         {scannerActive ? (
                             <Html5QrcodePlugin 
                                 fps={10}
                                 qrbox={250}
                                 disableFlip={false}
                                 qrCodeSuccessCallback={onNewScanResult}
+                                verbose={false} // Puedes cambiar a true para más logs de la librería
                             />
                         ) : (
                             <div className="text-center py-5">
+                                {/* Mensaje cuando el escáner está pausado */}
                                 <Spinner animation="border" className="mb-3" />
                                 <p>QR escaneado. Procesando transacción...</p>
-                                <Button variant="outline-primary" onClick={() => setScannerActive(true)}>
+                                <Button variant="outline-primary" onClick={activateScanner} className="mt-3">
                                     Activar Escáner para Nueva Transacción
                                 </Button>
                             </div>
                         )}
-                        <p className="text-center text-muted mt-3">Apunta la cámara al código QR del cliente.</p>
+                        {scannerActive && (
+                            <p className="text-center text-muted mt-3">Apunta la cámara al código QR del cliente.</p>
+                        )}
+                        {!scannerActive && (
+                            <p className="text-center text-muted mt-3">El escáner está pausado. Haz clic en el botón para activarlo.</p>
+                        )}
                     </Card>
                 </Col>
                 <Col md={6}>
