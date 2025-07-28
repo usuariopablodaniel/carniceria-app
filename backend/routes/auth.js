@@ -3,19 +3,11 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { Pool } = require('pg');
 
 const { protect, authorizeRoles } = require('../middleware/authMiddleware');
 const passport = require('passport');
 
-// Configuración de la base de datos (usando las variables de entorno de .env)
-const pool = new Pool({
-    user: process.env.DB_USER,
-    host: process.env.DB_HOST,
-    database: process.env.DB_NAME,
-    password: process.env.DB_PASSWORD,
-    port: process.env.DB_PORT,
-});
+const pool = require('../db'); // Importar el pool centralizado
 
 // CLAVE SECRETA PARA FIRMAR LOS TOKENS JWT
 const JWT_SECRET_GLOBAL = process.env.JWT_SECRET || 'supersecretkey_fallback'; 
@@ -143,7 +135,7 @@ router.get('/me', protect, async (req, res) => {
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
 router.get('/google/callback',
-    passport.authenticate('google', { failureRedirect: '/login-failure' }),
+    passport.authenticate('google', { failureRedirect: 'http://localhost:3000/login?message=google_login_failed' }), // <-- Cambio aquí
     async (req, res) => {
         console.log('--- BACKEND: Ruta /google/callback HA SIDO ALCANZADA ---');
 

@@ -1,16 +1,9 @@
 // backend/config/passport.js
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
-const { Pool } = require('pg'); 
 require('dotenv').config(); 
 
-const pool = new Pool({
-    user: process.env.DB_USER,
-    host: process.env.DB_HOST,
-    database: process.env.DB_NAME,
-    password: process.env.DB_PASSWORD,
-    port: process.env.DB_PORT,
-});
+const pool = require('../db'); // Importar el pool centralizado
 
 passport.serializeUser((user, done) => {
     done(null, user.id); 

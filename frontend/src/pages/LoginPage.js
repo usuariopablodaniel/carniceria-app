@@ -1,26 +1,24 @@
-import React, { useState, useEffect } from 'react'; // <<<<< Importa useEffect
+import React, { useState, useEffect } from 'react';
 import { Form, Button, Container, Row, Col, Alert } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
-import { Link, useNavigate, useLocation } from 'react-router-dom'; // <<<<< Importa useLocation
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import api from '../api/axios'; // Asegúrate de que esta importación sea correcta
 
 const LoginPage = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation(); // <<<<< Hook para acceder a la URL
+  const location = useLocation();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // <<<<<<<<<<<<<< NUEVO: useEffect para leer mensajes de la URL >>>>>>>>>>>>>>>
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const message = params.get('message');
     if (message === 'session_expired') {
       setError('Tu sesión ha expirado. Por favor, inicia sesión de nuevo.');
-      // Opcional: Limpiar el parámetro de la URL para que no se muestre en futuras cargas
       navigate(location.pathname, { replace: true }); 
     } else if (message === 'google_login_failed') {
       setError('Error al iniciar sesión con Google. Por favor, inténtalo de nuevo.');
@@ -29,7 +27,7 @@ const LoginPage = () => {
       setError('Error al procesar los datos de Google. Por favor, inténtalo de nuevo.');
       navigate(location.pathname, { replace: true });
     }
-  }, [location, navigate]); // Dependencias del useEffect
+  }, [location, navigate]);
 
   const handleSubmit = async (e) => {
     console.log('handleSubmit se está ejecutando.');
@@ -66,7 +64,11 @@ const LoginPage = () => {
   };
 
   const handleGoogleLoginRedirect = () => {
-    window.location.href = 'http://localhost:5000/api/auth/google';
+    // >>>>>>>>>>>>>>> ESTE LOG ES PARA VERIFICAR SI ESTE CÓDIGO SE ESTÁ EJECUTANDO <<<<<<<<<<<<<<<<
+    console.log('DEBUG: Redirigiendo a Google con la URL:', 'http://localhost:5000/api/auth/google');
+    // Esta es la URL completa que el navegador debe cargar para iniciar el flujo de autenticación de Google.
+    // DEBE COINCIDIR CON app.use('/api/auth', authRoutes) en server.js y router.get('/google', ...) en auth.js
+    window.location.href = 'http://localhost:5000/api/auth/google'; 
   };
 
   return (
@@ -74,7 +76,7 @@ const LoginPage = () => {
       <Row className="justify-content-md-center">
         <Col md={6}>
           <h1 className="text-center mb-4">Iniciar Sesión</h1>
-          {error && <Alert variant="danger">{error}</Alert>} {/* Muestra el error */}
+          {error && <Alert variant="danger">{error}</Alert>}
           <Form onSubmit={handleSubmit}>
             <Form.Group className="mb-3" controlId="formBasicEmail">
               <Form.Label>Email</Form.Label>

@@ -2,9 +2,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Container, Table, Button, Spinner, Alert, Modal, Form } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
+import api from '../api/axios'; // <<<<< CAMBIO CLAVE: Importar la instancia 'api'
 
-const API_URL = process.env.REACT_APP_API_URL;
+// const API_URL = process.env.REACT_APP_API_URL; // <<<<< ELIMINAR ESTA LÍNEA
 
 const UserManagementPage = () => {
     const { token, isAdmin, user } = useAuth();
@@ -32,8 +32,13 @@ const UserManagementPage = () => {
 
     // Usamos useCallback para memoizar fetchUsers
     const fetchUsers = useCallback(async () => {
+        // Si no es admin o no hay token, no intentamos la llamada API
         if (!isAdmin || !token) {
             setLoading(false);
+            // Si el usuario no es admin, establecemos un error para mostrar el mensaje de acceso denegado
+            if (!isAdmin) {
+                setError('Acceso denegado. Esta página es solo para administradores.');
+            }
             return; 
         }
 
@@ -41,11 +46,10 @@ const UserManagementPage = () => {
             setLoading(true);
             setError(null);
 
-            const response = await axios.get(`${API_URL}/auth/users`, {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            });
+            // >>>>>>>>>>>>>>> CAMBIO CLAVE AQUÍ: Usar 'api' y la ruta relativa <<<<<<<<<<<<<<<<
+            // La baseURL 'http://localhost:5000/api' ya está configurada en api/axios.js
+            // El token de autorización se añade automáticamente por el interceptor de 'api'.
+            const response = await api.get('/auth/users'); 
 
             // Filtramos la lista para que el administrador no pueda gestionarse a sí mismo
             const filteredUsers = response.data.users.filter(u => u.id !== user.id);
@@ -58,12 +62,12 @@ const UserManagementPage = () => {
             setError('Error al cargar usuarios. Verifica tu conexión o permisos.');
             setLoading(false);
         }
-    }, [isAdmin, token, user]); 
+    }, [isAdmin, token, user]); // Dependencias de useCallback
 
     // Llamada inicial para obtener usuarios
     useEffect(() => {
         fetchUsers();
-    }, [fetchUsers]);
+    }, [fetchUsers]); // Dependencia de useEffect para useCallback
 
     // --- Funciones para Editar Rol (Modal) ---
 
@@ -86,15 +90,11 @@ const UserManagementPage = () => {
         }
 
         try {
-            // Llamada PUT a la API para actualizar el rol
-            await axios.put(
-                `${API_URL}/auth/users/${currentUserToEdit.id}`,
-                { role: newRole },
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
+            // >>>>>>>>>>>>>>> CAMBIO CLAVE AQUÍ: Usar 'api' y la ruta relativa <<<<<<<<<<<<<<<<
+            await api.put(
+                `/auth/users/${currentUserToEdit.id}`,
+                { role: newRole }
+                // El token se añade automáticamente por el interceptor de 'api'.
             );
 
             // Si la actualización es exitosa, cerramos el modal y recargamos la lista de usuarios
@@ -103,7 +103,7 @@ const UserManagementPage = () => {
 
         } catch (err) {
             console.error('Error al actualizar rol:', err.response?.data || err.message);
-            setError('Error al actualizar el rol del usuario.');
+            setError('Error al actualizar el rol del usuario: ' + (err.response?.data?.error || err.message || 'Error desconocido'));
         }
     };
 
@@ -113,14 +113,10 @@ const UserManagementPage = () => {
         // Confirmación para prevenir eliminaciones accidentales
         if (window.confirm(`¿Estás seguro de que deseas eliminar al usuario ${userName}? Esta acción no se puede deshacer.`)) {
             try {
-                // Llamada DELETE a la API para eliminar el usuario
-                await axios.delete(
-                    `${API_URL}/auth/users/${userId}`,
-                    {
-                        headers: {
-                            Authorization: `Bearer ${token}`,
-                        },
-                    }
+                // >>>>>>>>>>>>>>> CAMBIO CLAVE AQUÍ: Usar 'api' y la ruta relativa <<<<<<<<<<<<<<<<
+                await api.delete(
+                    `/auth/users/${userId}`
+                    // El token se añade automáticamente por el interceptor de 'api'.
                 );
 
                 // Si la eliminación es exitosa, volvemos a cargar la lista de usuarios
@@ -128,14 +124,15 @@ const UserManagementPage = () => {
 
             } catch (err) {
                 console.error('Error al eliminar usuario:', err.response?.data || err.message);
-                setError('Error al eliminar el usuario. Por favor, verifica los permisos.');
+                setError('Error al eliminar el usuario: ' + (err.response?.data?.error || err.message || 'Error desconocido'));
             }
         }
     };
     
     // --- Renderizado Condicional ---
 
-    if (!isAdmin) {
+    // Si el usuario no es admin, mostramos el mensaje de acceso denegado inmediatamente
+    if (!isAdmin && !loading) { // Añadimos !loading para que no aparezca antes de que se resuelva isAdmin
         return <Alert variant="danger" className="mt-5">Acceso denegado. Esta página es solo para administradores.</Alert>;
     }
 

@@ -4,46 +4,36 @@ console.log('--- INICIO DE SERVER.JS ---');
 console.log('CLIENT_URL cargado en backend (server.js):', process.env.CLIENT_URL);
 
 const express = require('express');
-const { Pool } = require('pg');
 const cors = require('cors');
 const passport = require('passport');
 const session = require('express-session');
 const path = require('path');
-const fs = require('fs/promises'); // Necesario para fs.access
+const fs = require('fs/promises');
 
 console.log('Cargando configuración de Passport...');
-require('./config/passport'); // Configuración de Passport
+require('./config/passport'); 
 
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Define la ruta base de la carpeta de uploads de forma absoluta
 const UPLOADS_BASE_PATH = path.join('C:', 'Users', 'pablo', 'Pictures', 'uploads');
 const IMAGES_UPLOAD_PATH = path.join(UPLOADS_BASE_PATH, 'imagenes');
 console.log(`Ruta absoluta de imágenes de uploads: ${IMAGES_UPLOAD_PATH}`);
 
+const pool = require('./db'); // Importar el pool desde el nuevo archivo db.js
 
 // *** Importaciones de Rutas ***
 console.log('Importando rutas...');
 const authRoutes = require('./routes/auth');
 const productRoutes = require('./routes/productRoutes');
 const transactionRoutes = require('./routes/transactionRoutes'); 
-
-// Configuración de la base de datos PostgreSQL
-console.log('Configurando pool de PostgreSQL...');
-const pool = new Pool({
-    user: process.env.DB_USER,
-    host: process.env.DB_HOST,
-    database: process.env.DB_NAME,
-    password: process.env.DB_PASSWORD,
-    port: process.env.DB_PORT,
-});
+const notificationRoutes = require('./routes/notifications'); 
 
 // Middleware
 console.log('Configurando middlewares generales...');
 app.use(cors({
-    origin: 'http://localhost:3000', // Asegúrate de que esta sea la URL de tu frontend
-    credentials: true // Muy importante para las cookies de sesión de Passport
+    origin: 'http://localhost:3000', 
+    credentials: true 
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); 
@@ -61,33 +51,31 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // =======================================================
-// === USO DE RUTAS DE API ===
+// === USO DE RUTAS DE API (todas las rutas, incluyendo Google, bajo /api/auth) ===
 // =======================================================
 console.log('Configurando rutas de API...');
 app.use('/api/auth', (req, res, next) => { console.log('MIDDLEWARE: /api/auth'); next(); }, authRoutes);
 app.use('/api/products', (req, res, next) => { console.log('MIDDLEWARE: /api/products'); next(); }, productRoutes); 
 app.use('/api/transactions', (req, res, next) => { console.log('MIDDLEWARE: /api/transactions'); next(); }, transactionRoutes); 
+app.use('/api/notifications', (req, res, next) => { console.log('MIDDLEWARE: /api/notifications'); next(); }, notificationRoutes); 
 // =======================================================
 
 // =======================================================
 // === CONFIGURACIÓN PARA SERVIR ARCHIVOS ESTATICOS ===
-// === AÑADIDO: CABECERAS CACHE-CONTROL Y DEPURACIÓN DE RUTA ESTATICA ===
-// === CORREGIDO: DECODEURIComponent para nombres de archivo ===
 // =======================================================
 console.log('Configurando middleware para servir imágenes estáticas en /api/images...');
 app.use('/api/images', (req, res, next) => {
     console.log(`MIDDLEWARE: Solicitud a /api/images. URL original: ${req.originalUrl}`);
     
-    // Extraer el nombre del archivo de la URL y DECODIFICARLO
     const fileName = req.url.startsWith('/api/images/') ? req.url.replace('/api/images/', '') : req.url;
-    const decodedFileName = decodeURIComponent(fileName); // <-- ¡CORRECCIÓN CRÍTICA!
+    const decodedFileName = decodeURIComponent(fileName); 
 
-    const fullImagePath = path.join(IMAGES_UPLOAD_PATH, decodedFileName); // Usar el nombre de archivo decodificado
+    const fullImagePath = path.join(IMAGES_UPLOAD_PATH, decodedFileName); 
 
     fs.access(fullImagePath, fs.constants.F_OK)
         .then(() => {
             console.log(`MIDDLEWARE: Archivo de imagen encontrado: ${fullImagePath}`);
-            next(); // El archivo existe, pasar a express.static
+            next(); 
         })
         .catch((err) => {
             console.error(`ERROR: Archivo de imagen NO ENCONTRADO en el disco: ${fullImagePath}. Error: ${err.message}`);
@@ -96,13 +84,11 @@ app.use('/api/images', (req, res, next) => {
 }, express.static(IMAGES_UPLOAD_PATH, {
     setHeaders: function (res, path, stat) {
         console.log(`MIDDLEWARE: express.static sirviendo: ${path}`);
-        res.set('Cache-Control', 'no-store'); // Para desarrollo, no cachear
+        res.set('Cache-Control', 'no-store'); 
     },
-    fallthrough: false // Si express.static no puede servir el archivo (ej. permisos), no pasa al siguiente middleware
+    fallthrough: false 
 }));
 
-// Este middleware solo se ejecutará si express.static falló (por ejemplo, permisos)
-// o si el archivo no existía y el middleware anterior manejó el 404.
 app.use('/api/images', (req, res) => {
     console.error(`ERROR: Fallback de /api/images alcanzado. Algo salió mal al servir la imagen.`);
     res.status(500).json({ error: 'Error interno al servir la imagen.' });
@@ -145,12 +131,11 @@ app.use((err, req, res, next) => {
 // Middleware para manejar rutas no encontradas (404) para el resto de la API
 console.log('Configurando middleware para rutas 404...');
 app.use((req, res) => {
-    if (!res.headersSent) { // Solo si la respuesta no ha sido enviada ya
+    if (!res.headersSent) { 
         console.warn(`WARN: Ruta de API no encontrada: ${req.method} ${req.originalUrl}`);
         res.status(404).json({ error: 'Ruta de API no encontrada.' });
     }
 });
-
 
 // Iniciar el servidor
 app.listen(port, () => {
