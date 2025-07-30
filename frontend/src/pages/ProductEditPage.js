@@ -24,13 +24,12 @@ const ProductEditPage = () => {
     const [imagePreviewUrl, setImagePreviewUrl] = useState(''); 
 
     const [loadingProduct, setLoadingProduct] = useState(true); 
-    const [message, setMessage] = useState('');
-    const [error, setError] = useState('');
+    const [message, setMessage] = useState(null); 
+    const [error, setError] = useState(null); 
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const categories = ["Ternera", "Pollo", "Cerdo", "Pescado"];
 
-    // Usamos useCallback para fetchProduct para evitar que se recree en cada render
     const fetchProduct = useCallback(async () => {
         try {
             if (!id || isNaN(Number(id))) { 
@@ -114,16 +113,17 @@ const ProductEditPage = () => {
                     URL.revokeObjectURL(imagePreviewUrl);
                 }
                 setImagePreviewUrl(URL.createObjectURL(file));
-            } else {
-                if (formData.imagen_url) {
+            } else { 
+                if (formData.imagen_url) { 
                     const baseUrlWithoutApi = api.defaults.baseURL.replace('/api', '');
                     const fullImageUrl = formData.imagen_url.startsWith('/api/images/')
                         ? `${baseUrlWithoutApi}${formData.imagen_url}`
                         : `${api.defaults.baseURL}/images/${formData.imagen_url}`;
-                    setImagePreviewUrl(fullImageUrl);
+                    setImagePreviewUrl(fullImageUrl); 
                 } else {
-                    setImagePreviewUrl('');
+                    setImagePreviewUrl(''); 
                 }
+                setImageFile(null); 
             }
         } else {
             setFormData(prevData => {
@@ -149,17 +149,20 @@ const ProductEditPage = () => {
         }));
         setImageFile(null); 
         setImagePreviewUrl(''); 
-        console.log('FRONTEND DEBUG: handleRemoveCurrentImage - Imagen actual eliminada.'); 
+        console.log('FRONTEND DEBUG: handleRemoveCurrentImage - Imagen actual marcada para eliminación. formData.imagen_url (después):', ''); 
+        console.log('FRONTEND DEBUG: handleRemoveCurrentImage - imageFile (después):', null);
+        console.log('FRONTEND DEBUG: handleRemoveCurrentImage - imagePreviewUrl (después):', '');
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setMessage('');
-        setError('');
+        setMessage(null); 
+        setError(null); 
         setIsSubmitting(true);
 
         console.log('FRONTEND DEBUG: handleSubmit - Iniciando envío del formulario.'); 
-        console.log('FRONTEND DEBUG: handleSubmit - Valor de imageFile antes de FormData:', imageFile); 
+        console.log('FRONTEND DEBUG: handleSubmit - Estado inicial de imageFile:', imageFile); 
+        console.log('FRONTEND DEBUG: handleSubmit - Estado inicial de formData.imagen_url:', formData.imagen_url); 
 
         if (!formData.nombre || formData.stock === '') {
             setError('Nombre y Stock son obligatorios.');
@@ -225,43 +228,48 @@ const ProductEditPage = () => {
         dataToSend.append('stock', parsedStock);
         dataToSend.append('disponible', formData.disponible ? 'true' : 'false');
 
-        if (imageFile) {
+        if (imageFile) { 
             dataToSend.append('imagen', imageFile); 
             console.log('FRONTEND DEBUG: handleSubmit - Añadiendo imageFile a FormData:', imageFile.name); 
         } else if (formData.imagen_url === '') { 
             dataToSend.append('imagen_url_clear', 'true'); 
-            console.log('FRONTEND DEBUG: handleSubmit - Solicitud para limpiar imagen actual.'); 
-        } else {
-            console.log('FRONTEND DEBUG: handleSubmit - No se seleccionó nueva imagen ni se solicitó limpiar la actual.'); 
+            console.log('FRONTEND DEBUG: handleSubmit - Solicitud para limpiar imagen actual (imagen_url_clear: true).'); 
+        } else { 
+            console.log('FRONTEND DEBUG: handleSubmit - No se seleccionó nueva imagen ni se solicitó limpiar la actual. Se mantiene la imagen existente en DB.'); 
         }
 
+        console.log('FRONTEND DEBUG: Final FormData content antes de la llamada API:');
         for (let pair of dataToSend.entries()) {
             console.log(pair[0]+ ', ' + pair[1]); 
         }
+        console.log('FRONTEND DEBUG: Estado final de imageFile:', imageFile);
+        console.log('FRONTEND DEBUG: Estado final de formData.imagen_url:', formData.imagen_url);
 
         try {
-            // >>>>>>>>>>>>>>> CORRECCIÓN CLAVE AQUÍ: Añadir la cabecera Content-Type <<<<<<<<<<<<<<<<
             const response = await api.put(`/products/${id}`, dataToSend, {
                 headers: {
                     'Content-Type': 'multipart/form-data' 
                 }
             });
-            // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
             if (response.status === 200) {
                 setMessage('Producto actualizado exitosamente!');
                 setImageFile(null); 
-                if (response.data.product && response.data.product.imagen_url !== undefined) {
+                // >>>>>>>>>>>>>>> CORRECCIÓN CLAVE AQUÍ: Manejar imagen_url que puede ser null <<<<<<<<<<<<<<<<
+                // Asegurarse de que response.data.product.imagen_url no sea null antes de llamar a startsWith
+                if (response.data.product && response.data.product.imagen_url) { // <-- Cambio clave: Eliminar !== undefined y añadir && response.data.product.imagen_url
                     const baseUrlWithoutApi = api.defaults.baseURL.replace('/api', '');
                     const newFullImageUrl = response.data.product.imagen_url.startsWith('/api/images/')
                         ? `${baseUrlWithoutApi}${response.data.product.imagen_url}`
                         : `${api.defaults.baseURL}/images/${response.data.product.imagen_url}`;
                     setFormData(prevData => ({ ...prevData, imagen_url: response.data.product.imagen_url }));
                     setImagePreviewUrl(newFullImageUrl || '');
-                } else {
+                } else { // Si la imagen_url es null o undefined, o si no hay product en la respuesta
                     setFormData(prevData => ({ ...prevData, imagen_url: '' }));
                     setImagePreviewUrl('');
                 }
+                // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
                 setTimeout(() => {
                     navigate('/products');
                 }, 1500); 
@@ -311,8 +319,8 @@ const ProductEditPage = () => {
             <h1 className="mb-4 text-center text-primary">Editar Producto</h1>
             <p className="text-center text-muted mb-4">Modifica los detalles del producto.</p>
 
-            {message && <Alert variant="success" onClose={() => setMessage('')} dismissible>{message}</Alert>}
-            {error && <Alert variant="danger" onClose={() => setError('')} dismissible>{error}</Alert>}
+            {message && <Alert variant="success" onClose={() => setMessage(null)} dismissible>{message}</Alert>}
+            {error && <Alert variant="danger" onClose={() => setError(null)} dismissible>{error}</Alert>}
 
             <Form onSubmit={handleSubmit} encType="multipart/form-data"> 
                 <Form.Group className="mb-3" controlId="nombre">
