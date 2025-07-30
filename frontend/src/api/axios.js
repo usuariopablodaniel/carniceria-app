@@ -7,10 +7,14 @@ const api = axios.create({
     // En desarrollo, apunta a tu backend local.
     // En producción, esto debería cambiarse a la URL de tu backend desplegado.
     baseURL: 'http://localhost:5000/api', // Asegúrate de que esta URL sea correcta
-    withCredentials: true, // <<<<< MUY IMPORTANTE PARA LAS COOKIES DE SESIÓN DE PASSPORT
-    headers: {
-        'Content-Type': 'application/json',
-    },
+    withCredentials: true, // MUY IMPORTANTE PARA LAS COOKIES DE SESIÓN DE PASSPORT
+    // >>>>>>>>>>>>>>> CORRECCIÓN CLAVE AQUÍ: ELIMINAR Content-Type global <<<<<<<<<<<<<<<<
+    // Si se envía FormData, Axios automáticamente establecerá 'multipart/form-data'.
+    // Si se establece aquí a 'application/json', puede causar conflictos con Multer.
+    // headers: {
+    //     'Content-Type': 'application/json', // <<<< ¡ELIMINADO!
+    // },
+    // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 });
 
 // Interceptor de solicitudes para añadir el token JWT

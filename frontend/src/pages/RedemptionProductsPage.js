@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Container, Row, Col, Card, Spinner, Alert, Button } from 'react-bootstrap';
-import axios from '../api/axios';
+import { Container, Row, Col, Card, Spinner, Alert, Button, Image } from 'react-bootstrap'; 
+import api from '../api/axios'; 
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -13,35 +13,41 @@ const RedemptionProductsPage = () => {
     const [userPoints, setUserPoints] = useState(null);
 
     // Función auxiliar para construir la URL completa de la imagen
-    // No necesita useCallback si no tiene dependencias reactivas,
-    // o se usa useCallback con un array de dependencias vacío para memoizarla.
-    const getFullImageUrl = (relativePath) => { // <-- Corregido aquí: Eliminado useCallback si no es estrictamente necesario o se usa correctamente.
+    const getFullImageUrl = useCallback((relativePath) => {
         if (!relativePath) {
-            return null;
+            return null; 
         }
-        const backendBaseUrl = axios.defaults.baseURL.replace('/api', '');
-        return `${backendBaseUrl}${relativePath}`;
-    };
+        // Construye la URL base del backend sin el '/api' final
+        const baseUrlWithoutApi = api.defaults.baseURL.replace('/api', '');
+
+        // Si la ruta ya incluye '/api/images/', la usamos directamente con la base URL completa
+        if (relativePath.startsWith('/api/images/')) {
+            return `${baseUrlWithoutApi}${relativePath}`; 
+        } else {
+            // Si no, asumimos que es solo el nombre del archivo y construimos la URL completa
+            return `${api.defaults.baseURL}/images/${relativePath}`; 
+        }
+    }, []); // Dependencias: api.defaults.baseURL es una constante, no necesita ser una dependencia si no cambia.
 
     const fetchUserPoints = useCallback(async () => {
         if (!isAuthenticated || !user || !user.id) {
-            setUserPoints(0);
+            setUserPoints(0); // Establecer a 0 si no está autenticado o no hay usuario/ID
             return;
         }
         try {
-            const response = await axios.get(`/transactions/${user.id}/points`);
+            const response = await api.get(`/transactions/${user.id}/points`); 
             setUserPoints(response.data.points);
         } catch (err) {
             console.error('Error al obtener los puntos del usuario:', err);
-            setUserPoints(null);
+            setUserPoints(null); // Establecer a null en caso de error
         }
-    }, [isAuthenticated, user]);
+    }, [isAuthenticated, user]); // Dependencias: isAuthenticated y user son necesarias aquí.
 
-    const fetchRedemptionProducts = useCallback(async () => {
+    const fetchRedemptionProducts = useCallback(async () => { 
         setLoading(true);
         setError(null);
         try {
-            const response = await axios.get('/products');
+            const response = await api.get('/products'); 
             const redeemable = response.data.filter(p => p.puntos_canje !== null && p.puntos_canje > 0);
             setRedemptionProducts(redeemable);
         } catch (err) {
@@ -50,17 +56,17 @@ const RedemptionProductsPage = () => {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, []); // Dependencias: No se necesita 'api' aquí porque es una constante y no muta. fetchRedemptionProducts solo depende de sí misma.
 
     useEffect(() => {
         if (!loadingAuth) {
             fetchUserPoints();
         }
-    }, [isAuthenticated, user, loadingAuth, fetchUserPoints]);
+    }, [isAuthenticated, user, loadingAuth, fetchUserPoints]); // Dependencias: fetchUserPoints es una dependencia.
 
     useEffect(() => {
         fetchRedemptionProducts();
-    }, [fetchRedemptionProducts]);
+    }, [fetchRedemptionProducts]); // Dependencias: fetchRedemptionProducts es una dependencia.
 
     const handleAddProductClick = () => {
         navigate('/products/add');
@@ -71,11 +77,13 @@ const RedemptionProductsPage = () => {
     };
 
     const handleDeleteProduct = async (productId) => {
+        // >>>>>>>>>>>>>>> NOTA: window.confirm no funciona en entornos de iFrame. <<<<<<<<<<<<<<<<
+        // Para una aplicación en producción, deberías reemplazar esto con un modal de confirmación personalizado.
         if (window.confirm('¿Estás seguro de que quieres eliminar este producto de canje?')) {
             try {
-                await axios.delete(`/products/${productId}`);
+                await api.delete(`/products/${productId}`); 
                 console.log(`Producto de canje con ID ${productId} eliminado.`);
-                fetchRedemptionProducts(); // Recargar la lista después de eliminar
+                fetchRedemptionProducts(); // Volver a cargar la lista después de eliminar
             } catch (err) {
                 console.error("Error al eliminar el producto de canje:", err);
                 setError("No se pudo eliminar el producto de canje. Intenta de nuevo.");
@@ -155,19 +163,14 @@ const RedemptionProductsPage = () => {
                     {redemptionProducts.map(product => (
                         <Col key={product.id}>
                             <Card className="h-100 shadow-sm rounded-lg">
-                                {product.imagen_url ? (
-                                    <Card.Img
-                                        variant="top"
-                                        src={getFullImageUrl(product.imagen_url)}
-                                        alt={product.nombre}
-                                        style={{ height: '200px', objectFit: 'cover' }}
-                                        onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/400x200/cccccc/000000?text=Sin+Imagen'; }}
-                                    />
-                                ) : (
-                                    <div style={{ height: '200px', backgroundColor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>
-                                        Sin Imagen
-                                    </div>
-                                )}
+                                <Image
+                                    variant="top"
+                                    src={product.imagen_url ? getFullImageUrl(product.imagen_url) : 'https://placehold.co/400x200/cccccc/000000?text=Sin+Imagen'}
+                                    alt={product.nombre}
+                                    style={{ height: '200px', objectFit: 'cover' }}
+                                    loading="lazy" 
+                                    onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/400x200/cccccc/000000?text=Error+Carga+Imagen'; }}
+                                />
                                 <Card.Body className="d-flex flex-column">
                                     <Card.Title className="text-truncate" title={product.nombre}>{product.nombre}</Card.Title>
                                     <Card.Text className="text-muted small mb-2">

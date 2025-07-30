@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'; 
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Container, Form, Button, Alert, Spinner } from 'react-bootstrap';
-import axios from '../api/axios';
+import { Container, Form, Button, Alert, Spinner, Image } from 'react-bootstrap'; 
+import api from '../api/axios'; 
 
 const ProductEditPage = () => {
     const { id } = useParams();
@@ -15,8 +15,8 @@ const ProductEditPage = () => {
         precio: '',
         stock: '',
         unidad_de_medida: 'kg',
-        imagen_url: '',
-        categoria: '', // Valor inicial vacío para que el placeholder sea la primera opción
+        imagen_url: '', 
+        categoria: '', 
         disponible: true,
         puntos_canje: '',
     });
@@ -28,8 +28,55 @@ const ProductEditPage = () => {
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Definir las categorías disponibles
     const categories = ["Ternera", "Pollo", "Cerdo", "Pescado"];
+
+    // Usamos useCallback para fetchProduct para evitar que se recree en cada render
+    const fetchProduct = useCallback(async () => {
+        try {
+            if (!id || isNaN(Number(id))) { 
+                setError('ID de producto no válido o no proporcionado para edición.');
+                setLoadingProduct(false);
+                return; 
+            }
+
+            const response = await api.get(`/products/${id}`);
+            const productData = response.data;
+            
+            setFormData({
+                nombre: productData.nombre || '',
+                descripcion: productData.descripcion || '',
+                precio: productData.precio !== undefined && productData.precio !== null ? String(productData.precio) : '',
+                stock: productData.stock !== undefined && productData.stock !== null ? String(productData.stock) : '',
+                unidad_de_medida: productData.unidad_de_medida || 'kg',
+                imagen_url: productData.imagen_url || '', 
+                categoria: productData.categoria || '', 
+                disponible: productData.disponible !== undefined ? productData.disponible : true,
+                puntos_canje: productData.puntos_canje !== undefined && productData.puntos_canje !== null ? String(productData.puntos_canje) : '',
+            });
+
+            if (productData.imagen_url) {
+                const baseUrlWithoutApi = api.defaults.baseURL.replace('/api', ''); 
+                const fullImageUrl = productData.imagen_url.startsWith('/api/images/')
+                    ? `${baseUrlWithoutApi}${productData.imagen_url}` 
+                    : `${api.defaults.baseURL}/images/${productData.imagen_url}`; 
+                setImagePreviewUrl(fullImageUrl);
+            } else {
+                setImagePreviewUrl('');
+            }
+
+        } catch (err) {
+            console.error('Error al cargar el producto para edición:', err);
+            if (err.response) {
+                setError(err.response.data.error || `Error al cargar el producto (Código: ${err.response.status}).`);
+            } else if (err.request) {
+                setError('No se pudo conectar con el servidor. Verifica tu conexión.');
+            } else {
+                setError('Ocurrió un error inesperado al procesar la solicitud.');
+            }
+        } finally {
+            setLoadingProduct(false);
+        }
+    }, [id]); 
 
     useEffect(() => {
         if (loadingAuth) {
@@ -46,48 +93,6 @@ const ProductEditPage = () => {
             return; 
         }
 
-        const fetchProduct = async () => {
-            try {
-                if (!id || isNaN(Number(id))) { 
-                    setError('ID de producto no válido o no proporcionado para edición.');
-                    setLoadingProduct(false);
-                    return; 
-                }
-
-                const requestUrl = `/products/${id}`;
-                const response = await axios.get(requestUrl);
-                const productData = response.data;
-                setFormData({
-                    nombre: productData.nombre || '',
-                    descripcion: productData.descripcion || '',
-                    precio: productData.precio !== undefined && productData.precio !== null ? String(productData.precio) : '',
-                    stock: productData.stock !== undefined && productData.stock !== null ? String(productData.stock) : '',
-                    unidad_de_medida: productData.unidad_de_medida || 'kg',
-                    imagen_url: productData.imagen_url || '',
-                    categoria: productData.categoria || '', // Asegurarse de que la categoría existente se cargue
-                    disponible: productData.disponible !== undefined ? productData.disponible : true,
-                    puntos_canje: productData.puntos_canje !== undefined && productData.puntos_canje !== null ? String(productData.puntos_canje) : '',
-                });
-                if (productData.imagen_url) {
-                    const backendBaseUrl = axios.defaults.baseURL.replace('/api', '');
-                    setImagePreviewUrl(`${backendBaseUrl}${productData.imagen_url}`);
-                } else {
-                    setImagePreviewUrl('');
-                }
-            } catch (err) {
-                console.error('Error al cargar el producto para edición:', err);
-                if (err.response) {
-                    setError(err.response.data.error || `Error al cargar el producto (Código: ${err.response.status}).`);
-                } else if (err.request) {
-                    setError('No se pudo conectar con el servidor. Verifica tu conexión.');
-                } else {
-                    setError('Ocurrió un error inesperado al procesar la solicitud.');
-                }
-            } finally {
-                setLoadingProduct(false);
-            }
-        };
-
         fetchProduct();
 
         return () => {
@@ -95,14 +100,14 @@ const ProductEditPage = () => {
                 URL.revokeObjectURL(imagePreviewUrl);
             }
         };
-
-    }, [id, user, navigate, isAuthenticated, loadingAuth, imagePreviewUrl]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id, user, navigate, isAuthenticated, loadingAuth, fetchProduct]); 
 
     const handleChange = (e) => {
         const { name, value, type, checked, files } = e.target;
         if (type === 'file') {
             const file = files[0];
-            setImageFile(file);
+            setImageFile(file); 
             console.log('FRONTEND DEBUG: handleChange - Archivo seleccionado:', file); 
             if (file) {
                 if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
@@ -110,12 +115,12 @@ const ProductEditPage = () => {
                 }
                 setImagePreviewUrl(URL.createObjectURL(file));
             } else {
-                if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
-                    URL.revokeObjectURL(imagePreviewUrl);
-                }
                 if (formData.imagen_url) {
-                    const backendBaseUrl = axios.defaults.baseURL.replace('/api', '');
-                    setImagePreviewUrl(`${backendBaseUrl}${formData.imagen_url}`);
+                    const baseUrlWithoutApi = api.defaults.baseURL.replace('/api', '');
+                    const fullImageUrl = formData.imagen_url.startsWith('/api/images/')
+                        ? `${baseUrlWithoutApi}${formData.imagen_url}`
+                        : `${api.defaults.baseURL}/images/${formData.imagen_url}`;
+                    setImagePreviewUrl(fullImageUrl);
                 } else {
                     setImagePreviewUrl('');
                 }
@@ -142,8 +147,8 @@ const ProductEditPage = () => {
             ...prevData,
             imagen_url: '' 
         }));
-        setImageFile(null);
-        setImagePreviewUrl('');
+        setImageFile(null); 
+        setImagePreviewUrl(''); 
         console.log('FRONTEND DEBUG: handleRemoveCurrentImage - Imagen actual eliminada.'); 
     };
 
@@ -201,7 +206,6 @@ const ProductEditPage = () => {
             return;
         }
 
-        // Validación para la categoría: debe ser seleccionada
         if (!formData.categoria || formData.categoria === '') {
             setError('Debe seleccionar una categoría para el producto.');
             setIsSubmitting(false);
@@ -224,7 +228,6 @@ const ProductEditPage = () => {
         if (imageFile) {
             dataToSend.append('imagen', imageFile); 
             console.log('FRONTEND DEBUG: handleSubmit - Añadiendo imageFile a FormData:', imageFile.name); 
-            setImageFile(null); 
         } else if (formData.imagen_url === '') { 
             dataToSend.append('imagen_url_clear', 'true'); 
             console.log('FRONTEND DEBUG: handleSubmit - Solicitud para limpiar imagen actual.'); 
@@ -237,14 +240,22 @@ const ProductEditPage = () => {
         }
 
         try {
-            const response = await axios.put(`/products/${id}`, dataToSend);
-            
+            // >>>>>>>>>>>>>>> CORRECCIÓN CLAVE AQUÍ: Añadir la cabecera Content-Type <<<<<<<<<<<<<<<<
+            const response = await api.put(`/products/${id}`, dataToSend, {
+                headers: {
+                    'Content-Type': 'multipart/form-data' 
+                }
+            });
+            // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
             if (response.status === 200) {
                 setMessage('Producto actualizado exitosamente!');
                 setImageFile(null); 
                 if (response.data.product && response.data.product.imagen_url !== undefined) {
-                    const backendBaseUrl = axios.defaults.baseURL.replace('/api', '');
-                    const newFullImageUrl = `${backendBaseUrl}${response.data.product.imagen_url}`;
+                    const baseUrlWithoutApi = api.defaults.baseURL.replace('/api', '');
+                    const newFullImageUrl = response.data.product.imagen_url.startsWith('/api/images/')
+                        ? `${baseUrlWithoutApi}${response.data.product.imagen_url}`
+                        : `${api.defaults.baseURL}/images/${response.data.product.imagen_url}`;
                     setFormData(prevData => ({ ...prevData, imagen_url: response.data.product.imagen_url }));
                     setImagePreviewUrl(newFullImageUrl || '');
                 } else {
@@ -334,6 +345,7 @@ const ProductEditPage = () => {
                         value={formData.precio}
                         onChange={handleChange}
                         step="0.01"
+                        placeholder="Ej: 15.75"
                     />
                 </Form.Group>
                 
@@ -359,6 +371,7 @@ const ProductEditPage = () => {
                         name="stock"
                         value={formData.stock}
                         onChange={handleChange}
+                        placeholder="Ej: 100 (unidades o kg)"
                         required
                     />
                 </Form.Group>
@@ -382,15 +395,16 @@ const ProductEditPage = () => {
                     <Form.Control
                         type="file"
                         name="imagen"
-                        onChange={handleChange}
+                        onChange={handleChange} 
                         accept="image/*"
                     />
                     {imagePreviewUrl && (
                         <div className="mt-2 text-center">
                             <p className="text-muted mb-1">Previsualización:</p>
-                            <img 
+                            <Image 
                                 src={imagePreviewUrl} 
                                 alt="Previsualización del producto" 
+                                fluid 
                                 style={{ width: '100%', maxWidth: '200px', height: 'auto', maxHeight: '200px', objectFit: 'contain', border: '1px solid #ddd', borderRadius: '4px' }} 
                                 loading="lazy" 
                             />
@@ -423,9 +437,9 @@ const ProductEditPage = () => {
                         name="categoria"
                         value={formData.categoria}
                         onChange={handleChange}
-                        required // Hacer que la selección de categoría sea obligatoria
+                        required 
                     >
-                        <option value="">-- Selecciona una categoría --</option> {/* Opción por defecto */}
+                        <option value="">-- Selecciona una categoría --</option> 
                         {categories.map(cat => (
                             <option key={cat} value={cat}>{cat}</option>
                         ))}

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Container, Form, Button, Alert, Spinner } from 'react-bootstrap';
-import axios from '../api/axios';
+import { Container, Form, Button, Alert, Spinner, Image } from 'react-bootstrap'; 
+import api from '../api/axios'; // Usar la instancia 'api' de axios
 
 const ProductAddPage = () => {
     const navigate = useNavigate();
@@ -15,7 +15,7 @@ const ProductAddPage = () => {
         stock: '',
         unidad_de_medida: 'kg',
         imagen_url: '', 
-        categoria: '', // Valor inicial vacío para que el placeholder sea la primera opción
+        categoria: '', 
         disponible: true,
         puntos_canje: '', 
     });
@@ -25,7 +25,6 @@ const ProductAddPage = () => {
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Definir las categorías disponibles
     const categories = ["Ternera", "Pollo", "Cerdo", "Pescado"];
 
     useEffect(() => {
@@ -43,11 +42,12 @@ const ProductAddPage = () => {
         }
 
         return () => {
+            // Limpiar la URL de previsualización cuando el componente se desmonte
             if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
                 URL.revokeObjectURL(imagePreviewUrl);
             }
         };
-    }, [user, navigate, isAuthenticated, loadingAuth, imagePreviewUrl]);
+    }, [user, navigate, isAuthenticated, loadingAuth, imagePreviewUrl]); // imagePreviewUrl como dependencia para el cleanup
 
     const handleChange = (e) => {
         const { name, value, type, checked, files } = e.target;
@@ -55,11 +55,13 @@ const ProductAddPage = () => {
             const file = files[0];
             setImageFile(file);
             if (file) {
+                // Si ya hay una URL de previsualización existente, la revocamos para liberar memoria
                 if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
                     URL.revokeObjectURL(imagePreviewUrl);
                 }
-                setImagePreviewUrl(URL.createObjectURL(file));
+                setImagePreviewUrl(URL.createObjectURL(file)); // Crear nueva URL de previsualización
             } else {
+                // Si no se selecciona ningún archivo, limpiar la previsualización
                 if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
                     URL.revokeObjectURL(imagePreviewUrl);
                 }
@@ -72,6 +74,7 @@ const ProductAddPage = () => {
                     [name]: type === 'checkbox' ? checked : value,
                 };
 
+                // Lógica para asegurar que solo se ingrese precio O puntos de canje
                 if (name === 'precio' && value !== '' && newData.puntos_canje !== '') {
                     newData.puntos_canje = '';
                 } else if (name === 'puntos_canje' && value !== '' && newData.precio !== '') {
@@ -134,7 +137,6 @@ const ProductAddPage = () => {
             return;
         }
         
-        // Validación para la categoría: debe ser seleccionada
         if (!formData.categoria || formData.categoria === '') {
             setError('Debe seleccionar una categoría para el producto.');
             setIsSubmitting(false);
@@ -143,40 +145,49 @@ const ProductAddPage = () => {
 
         const dataToSend = new FormData();
         for (const key in formData) {
+            // Excluimos las claves que manejamos específicamente o que no son parte del FormData directo
             if (['precio', 'puntos_canje', 'stock', 'disponible', 'imagen_url'].includes(key)) {
                 continue; 
             }
             dataToSend.append(key, formData[key]);
         }
         
+        // Añadir valores numéricos y booleanos
         dataToSend.append('precio', hasPriceInput ? parseFloat(formData.precio) : ''); 
         dataToSend.append('puntos_canje', hasPointsInput ? parseInt(formData.puntos_canje) : '');
         dataToSend.append('stock', parsedStock);
         dataToSend.append('disponible', formData.disponible ? 'true' : 'false');
         
+        // Añadir el archivo de imagen si existe
         if (imageFile) {
             dataToSend.append('imagen', imageFile);
         } 
 
         try {
-            const response = await axios.post('/products', dataToSend); 
+            // La instancia 'api' ya tiene la baseURL y el interceptor de token
+            const response = await api.post('/products', dataToSend, {
+                headers: {
+                    'Content-Type': 'multipart/form-data' // Importante para enviar archivos
+                }
+            }); 
             
-            if (response.status === 201) {
+            if (response.status === 201) { 
                 setMessage('Producto añadido exitosamente!');
+                // Resetear el formulario después de un envío exitoso
                 setFormData({
                     nombre: '',
                     descripcion: '',
                     precio: '',
                     stock: '',
                     unidad_de_medida: 'kg',
-                    categoria: '', // Restablecer a vacío para el placeholder
+                    categoria: '', 
                     disponible: true,
                     puntos_canje: '', 
                 });
                 setImageFile(null);
                 setImagePreviewUrl('');
                 setTimeout(() => {
-                    navigate('/products');
+                    navigate('/products'); 
                 }, 1500); 
             } else {
                 setError(response.data.error || 'Error desconocido al añadir el producto.');
@@ -302,9 +313,10 @@ const ProductAddPage = () => {
                     {imagePreviewUrl && (
                         <div className="mt-2 text-center">
                             <p className="text-muted mb-1">Previsualización:</p>
-                            <img 
+                            <Image 
                                 src={imagePreviewUrl} 
                                 alt="Previsualización del producto" 
+                                fluid 
                                 style={{ width: '100%', maxWidth: '200px', height: 'auto', maxHeight: '200px', objectFit: 'contain', border: '1px solid #ddd', borderRadius: '4px' }} 
                                 loading="lazy" 
                             />
@@ -324,9 +336,9 @@ const ProductAddPage = () => {
                         name="categoria"
                         value={formData.categoria}
                         onChange={handleChange}
-                        required // Hacer que la selección de categoría sea obligatoria
+                        required 
                     >
-                        <option value="">-- Selecciona una categoría --</option> {/* Opción por defecto */}
+                        <option value="">-- Selecciona una categoría --</option> 
                         {categories.map(cat => (
                             <option key={cat} value={cat}>{cat}</option>
                         ))}

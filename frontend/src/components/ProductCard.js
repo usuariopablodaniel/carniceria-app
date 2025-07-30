@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, Button, Badge, Alert, Spinner } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import axios from '../api/axios';
+import api from '../api/axios'; // Usar la instancia 'api' de axios
 
 // Añadimos 'onProductDeleted' como prop, para que el componente padre (ProductListPage)
 // sepa cuándo un producto ha sido eliminado y pueda recargar la lista.
@@ -21,33 +21,33 @@ const ProductCard = ({ product, onProductDeleted }) => {
         }).format(price);
     };
 
-    // Función para manejar imagen_url vacía o error
+    // >>>>>>>>>>>>>>> LÓGICA DE IMAGEN: Simplificada <<<<<<<<<<<<<<<<
+    // Este componente recibe la URL completa de la imagen desde el padre (ProductListPage o RedemptionProductsPage).
+    // Por lo tanto, solo necesita manejar el caso de que la URL sea nula/vacía o si la carga falla.
     const getImageUrl = (url) => {
         if (!url || url.trim() === '') {
-            // >>>>>>>>>>>>>>> ESTA ES LA RUTA PARA TUS IMÁGENES LOCALES <<<<<<<<<<<<<<<<
-            // Asegúrate de que esta imagen exista en src/assets/images/placeholder.png
-            // O, si sigues mi recomendación de la carpeta public: /images/placeholder.png
-            // He cambiado a rutas relativas a `public` que son más sencillas para assets estáticos.
-            return '/images/placeholder.png'; 
+            // Placeholder si no hay URL de imagen
+            return 'https://placehold.co/400x200/cccccc/000000?text=Sin+Imagen'; 
         }
-        return url;
+        return url; // La URL ya debería ser la completa (ej. http://localhost:5000/api/images/nombre.jpg)
     };
 
     // Función para manejar errores de carga de imagen
     const handleImageError = (e) => {
-        e.target.onerror = null;
-        // >>>>>>>>>>>>>>> ESTA ES LA RUTA PARA TUS IMÁGENES LOCALES <<<<<<<<<<<<<<<<
-        // Asegúrate de que esta imagen exista en src/assets/images/error_image.png
-        // O, si sigues mi recomendación de la carpeta public: /images/error_image.png
-        e.target.src = '/images/error_image.png'; // Fallback final
+        e.target.onerror = null; // Evita bucles infinitos de error
+        // Fallback final si la imagen no carga por cualquier razón
+        e.target.src = 'https://placehold.co/400x200/cccccc/000000?text=Error+Carga+Imagen'; 
     };
+    // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
     const handleDelete = async () => {
         setError(null);
+        // >>>>>>>>>>>>>>> NOTA: window.confirm no funciona en entornos de iFrame. <<<<<<<<<<<<<<<<
+        // Para una aplicación en producción, deberías reemplazar esto con un modal de confirmación personalizado.
         if (window.confirm(`¿Estás seguro de que quieres eliminar el producto "${product.nombre}"? Esta acción es irreversible.`)) {
             setLoading(true);
             try {
-                const response = await axios.delete(`/products/${product.id}`); 
+                const response = await api.delete(`/products/${product.id}`); // Usar 'api' en lugar de 'axios'
                 
                 if (response.status === 200) {
                     console.log('Producto eliminado:', product.nombre);
@@ -77,7 +77,7 @@ const ProductCard = ({ product, onProductDeleted }) => {
             {error && <Alert variant="danger" className="m-2">{error}</Alert>}
             <Card.Img
                 variant="top"
-                src={getImageUrl(product.imagen_url)}
+                src={getImageUrl(product.imagen_url)} // product.imagen_url ya debería ser la URL completa o null
                 alt={product.nombre}
                 style={{ height: '180px', objectFit: 'cover', borderTopLeftRadius: 'calc(.25rem - 1px)', borderTopRightRadius: 'calc(.25rem - 1px)' }}
                 onError={handleImageError}
@@ -101,7 +101,7 @@ const ProductCard = ({ product, onProductDeleted }) => {
                 </Card.Text>
                 
                 <div className="mt-auto pt-2">
-                    {/* >>>>>>>>>>>>> LÓGICA CONDICIONAL PARA PRECIO O PUNTOS_CANJE <<<<<<<<<<<<< */}
+                    {/* LÓGICA CONDICIONAL PARA PRECIO O PUNTOS_CANJE */}
                     {product.puntos_canje !== null && product.puntos_canje !== undefined ? (
                         <Card.Text className="mb-1 text-success fw-bold fs-5">
                             {product.puntos_canje} Puntos
@@ -111,7 +111,7 @@ const ProductCard = ({ product, onProductDeleted }) => {
                             {formatPrice(product.precio)} / {product.unidad_de_medida}
                         </Card.Text>
                     )}
-                    {/* >>>>>>>>>>>>> FIN LÓGICA CONDICIONAL <<<<<<<<<<<<< */}
+                    {/* FIN LÓGICA CONDICIONAL */}
 
                     <Card.Text className="mb-1 text-secondary">
                         Stock: {product.stock}
@@ -145,10 +145,10 @@ const ProductCard = ({ product, onProductDeleted }) => {
                         </Button>
                     </div>
                 )}
-                {/* >>>>>>>>> Botón para canjear productos (visible para usuarios normales en la página de canje) <<<<<<<<< */}
+                {/* Botón para canjear productos (visible para usuarios normales en la página de canje) */}
                 {isAuthenticated && user && user.role === 'user' && product.puntos_canje !== null && product.puntos_canje !== undefined && (
                     <div className="d-grid gap-2 mt-3">
-                        <Button variant="success" size="md">
+                        <Button variant="success" size="md" onClick={() => navigate('/dashboard', { state: { message: `¡Excelente! Muestra tu código QR al vendedor para canjear "${product.nombre}".`, variant: 'success' } })}>
                             Canjear por {product.puntos_canje} Puntos
                         </Button>
                     </div>
