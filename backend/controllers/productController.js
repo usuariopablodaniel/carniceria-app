@@ -1,21 +1,18 @@
 // backend/controllers/productController.js
 
-const { Pool } = require('pg');
+const pool = require('../db'); 
 const path = require('path');
-const fs = require('fs/promises');
+const fs = require('fs/promises'); 
 
-// Define la ruta base de la carpeta de uploads de forma absoluta
-const UPLOADS_BASE_PATH = path.join('C:', 'Users', 'pablo', 'Pictures', 'uploads');
+// >>>>>>>>>>>>>>> RUTA DE UPLOADS: Asegúrate de que esta ruta coincida con server.js y productRoutes.js <<<<<<<<<<<<<<<<
+// Debe ser 'C:\temp\uploads\imagenes' si esa es la ruta que estás usando ahora.
+const UPLOADS_BASE_PATH = path.join('C:', 'temp', 'uploads'); // CAMBIADO a C:\temp
 const IMAGES_UPLOAD_PATH = path.join(UPLOADS_BASE_PATH, 'imagenes');
+// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-const pool = new Pool({
-    user: process.env.DB_USER,
-    host: process.env.DB_HOST,
-    database: process.env.DB_NAME,
-    password: process.env.DB_PASSWORD,
-    port: process.env.DB_PORT,
-});
-
+// @desc    Obtener todos los productos
+// @route   GET /api/products
+// @access  Public
 exports.getProducts = async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM productos ORDER BY nombre ASC');
@@ -26,6 +23,9 @@ exports.getProducts = async (req, res) => {
     }
 };
 
+// @desc    Obtener un producto por ID
+// @route   GET /api/products/:id
+// @access  Public
 exports.getProductById = async (req, res) => {
     const { id } = req.params;
     try {
@@ -40,11 +40,17 @@ exports.getProductById = async (req, res) => {
     }
 };
 
+// @desc    Añadir un nuevo producto
+// @route   POST /api/products
+// @access  Private (Admin)
 exports.addProduct = async (req, res) => {
+    // El error "Cannot destructure property 'nombre' of 'req.body' as it is undefined."
+    // ocurre aquí si Multer no ha procesado el FormData.
     const { nombre, descripcion, precio, stock, unidad_de_medida, categoria, disponible, puntos_canje } = req.body;
-    let imagen_url = null;
+    let imagen_url = null; 
 
     console.log('ADD PRODUCT DEBUG: Iniciando addProduct. req.file:', req.file); 
+    console.log('ADD PRODUCT DEBUG: req.body:', req.body); // Añadir este log para ver el contenido del body
 
     if (req.file) {
         imagen_url = `/api/images/${req.file.filename}`; 
@@ -56,18 +62,20 @@ exports.addProduct = async (req, res) => {
     const finalPrecio = (precio === undefined || precio === null || precio === '') ? null : parseFloat(precio);
     const finalPuntosCanje = (puntos_canje === undefined || puntos_canje === null || puntos_canje === '') ? null : parseInt(puntos_canje);
 
-    if (!nombre || nombre.trim() === '') {
-        if (req.file) {
-            console.log('ADD PRODUCT DEBUG: Nombre vacío, intentando eliminar archivo:', req.file.filename); 
-            await fs.unlink(path.join(IMAGES_UPLOAD_PATH, req.file.filename)).catch(err => console.error("Error al eliminar imagen subida por validación (nombre):", err));
+    const cleanUploadedFileOnError = async (file) => {
+        if (file) {
+            const filePath = path.join(IMAGES_UPLOAD_PATH, file.filename);
+            console.log(`ADD PRODUCT DEBUG: Intentando eliminar archivo ${file.filename} debido a error de validación.`);
+            await fs.unlink(filePath).catch(err => console.error("Error al eliminar imagen subida por validación:", err));
         }
+    };
+
+    if (!nombre || nombre.trim() === '') {
+        await cleanUploadedFileOnError(req.file);
         return res.status(400).json({ error: 'El nombre del producto es obligatorio.' });
     }
     if (stock === undefined || stock === null || stock === '') {
-        if (req.file) {
-            console.log('ADD PRODUCT DEBUG: Stock vacío, intentando eliminar archivo:', req.file.filename); 
-            await fs.unlink(path.join(IMAGES_UPLOAD_PATH, req.file.filename)).catch(err => console.error("Error al eliminar imagen subida por validación (stock):", err));
-        }
+        await cleanUploadedFileOnError(req.file);
         return res.status(400).json({ error: 'El stock es obligatorio.' });
     }
 
@@ -75,45 +83,31 @@ exports.addProduct = async (req, res) => {
     const hasPointsInput = finalPuntosCanje !== null;
 
     if (!hasPriceInput && !hasPointsInput) {
-        if (req.file) {
-            console.log('ADD PRODUCT DEBUG: Precio/Puntos vacíos, intentando eliminar archivo:', req.file.filename); 
-            await fs.unlink(path.join(IMAGES_UPLOAD_PATH, req.file.filename)).catch(err => console.error("Error al eliminar imagen subida por validación (precio/puntos):", err));
-        }
+        await cleanUploadedFileOnError(req.file);
         return res.status(400).json({ error: 'Debe ingresar un Precio o Puntos de Canje para el producto.' });
     }
     if (hasPriceInput && hasPointsInput) {
-        if (req.file) {
-            console.log('ADD PRODUCT DEBUG: Ambos precio/puntos, intentando eliminar archivo:', req.file.filename); 
-            await fs.unlink(path.join(IMAGES_UPLOAD_PATH, req.file.filename)).catch(err => console.error("Error al eliminar imagen subida por validación (ambos):", err));
-        }
+        await cleanUploadedFileOnError(req.file);
         return res.status(400).json({ error: 'No puede ingresar Precio y Puntos de Canje a la vez. Elija uno.' });
     }
 
     if (hasPriceInput) {
         if (isNaN(finalPrecio) || finalPrecio <= 0) {
-            if (req.file) {
-                console.log('ADD PRODUCT DEBUG: Precio inválido, intentando eliminar archivo:', req.file.filename); 
-                await fs.unlink(path.join(IMAGES_UPLOAD_PATH, req.file.filename)).catch(err => console.error("Error al eliminar imagen subida por validación (precio inválido):", err));
-            }
+            await cleanUploadedFileOnError(req.file);
             return res.status(400).json({ error: 'El precio debe ser un número positivo.' });
         }
     }
 
     if (hasPointsInput) {
         if (isNaN(finalPuntosCanje) || finalPuntosCanje < 0) {
-            if (req.file) {
-                console.log('ADD PRODUCT DEBUG: Puntos inválidos, intentando eliminar archivo:', req.file.filename); 
-                await fs.unlink(path.join(IMAGES_UPLOAD_PATH, req.file.filename)).catch(err => console.error("Error al eliminar imagen subida por validación (puntos inválidos):", err));
-            }
+            await cleanUploadedFileOnError(req.file);
             return res.status(400).json({ error: 'Los puntos de canje deben ser un número no negativo.' });
         }
     }
 
-    if (isNaN(parseInt(stock)) || parseInt(stock) < 0) {
-        if (req.file) {
-            console.log('ADD PRODUCT DEBUG: Stock inválido, intentando eliminar archivo:', req.file.filename); 
-            await fs.unlink(path.join(IMAGES_UPLOAD_PATH, req.file.filename)).catch(err => console.error("Error al eliminar imagen subida por validación (stock inválido):", err));
-        }
+    const parsedStock = parseInt(stock);
+    if (isNaN(parsedStock) || parsedStock < 0) {
+        await cleanUploadedFileOnError(req.file);
         return res.status(400).json({ error: 'El stock debe ser un número no negativo.' });
     }
 
@@ -125,24 +119,22 @@ exports.addProduct = async (req, res) => {
             [
                 nombre,
                 descripcion,
-                finalPrecio,
-                parseInt(stock),
+                finalPrecio, 
+                parsedStock, 
                 unidad_de_medida,
-                imagen_url,
+                imagen_url, 
                 categoria,
                 disponible,
-                finalPuntosCanje
+                finalPuntosCanje 
             ]
         );
         console.log('ADD PRODUCT DEBUG: Producto insertado en DB. Resultado:', result.rows[0]); 
         res.status(201).json(result.rows[0]);
     } catch (err) {
         console.error('ADD PRODUCT ERROR: Error al añadir producto en DB:', err.message);
-        if (req.file) {
-            console.log('ADD PRODUCT DEBUG: Intentando eliminar archivo por fallo de DB:', req.file.filename); 
-            await fs.unlink(path.join(IMAGES_UPLOAD_PATH, req.file.filename)).catch(unlinkErr => console.error("Error al eliminar imagen subida por fallo de DB:", unlinkErr));
-        }
-        if (err.code === '23502') {
+        await cleanUploadedFileOnError(req.file); 
+        
+        if (err.code === '23502') { 
              res.status(400).json({ error: 'Faltan campos obligatorios o hay un problema de formato en la base de datos.' });
         } else {
             res.status(500).json({ error: 'Error interno del servidor al añadir el producto.' });
@@ -150,13 +142,19 @@ exports.addProduct = async (req, res) => {
     }
 };
 
+// @desc    Actualizar un producto existente
+// @route   PUT /api/products/:id
+// @access  Private (Admin)
 exports.updateProduct = async (req, res) => {
     const { id } = req.params;
-    const { nombre, descripcion, precio, stock, unidad_de_medida, categoria, disponible, puntos_canje } = req.body;
-    let new_imagen_url = null;
+    // El error "Cannot destructure property 'nombre' of 'req.body' as it is undefined."
+    // ocurre aquí si Multer no ha procesado el FormData.
+    const { nombre, descripcion, precio, stock, unidad_de_medida, categoria, disponible, puntos_canje, imagen_url_clear } = req.body; 
+    let new_imagen_url = null; 
 
-    console.log('UPDATE PRODUCT DEBUG: Iniciando updateProduct. req.file:', req.file); // Depuración: Verifica si Multer procesó el archivo
-    console.log('UPDATE PRODUCT DEBUG: req.body:', req.body); // Depuración: Verifica los datos del formulario
+    console.log('UPDATE PRODUCT DEBUG: INICIO DE updateProduct. req.file (desde Multer):', req.file); 
+    console.log('UPDATE PRODUCT DEBUG: req.body (desde Multer):', req.body); // Añadir este log para ver el contenido del body
+    console.log('UPDATE PRODUCT DEBUG: req.body.imagen_url_clear (desde Frontend):', imagen_url_clear); 
 
     const finalPrecio = (precio === undefined || precio === null || precio === '') ? null : parseFloat(precio);
     const finalPuntosCanje = (puntos_canje === undefined || puntos_canje === null || puntos_canje === '') ? null : parseInt(puntos_canje);
@@ -164,65 +162,69 @@ exports.updateProduct = async (req, res) => {
     const hasPriceInput = finalPrecio !== null;
     const hasPointsInput = finalPuntosCanje !== null;
 
-    if (hasPriceInput && hasPointsInput) {
-        if (req.file) {
-            console.log('UPDATE PRODUCT DEBUG: Ambos precio/puntos, intentando eliminar archivo:', req.file.filename); 
-            await fs.unlink(path.join(IMAGES_UPLOAD_PATH, req.file.filename)).catch(err => console.error("Error al eliminar imagen subida por validación (ambos):", err));
+    const cleanUploadedFileOnError = async (file) => {
+        if (file) {
+            const filePath = path.join(IMAGES_UPLOAD_PATH, file.filename);
+            console.log(`UPDATE PRODUCT DEBUG: Intentando eliminar archivo ${file.filename} debido a error de validación.`);
+            await fs.unlink(filePath).catch(err => console.error("Error al eliminar imagen subida por validación:", err));
         }
+    };
+
+    if (hasPriceInput && hasPointsInput) {
+        await cleanUploadedFileOnError(req.file);
         return res.status(400).json({ error: 'No puede actualizar Precio y Puntos de Canje a la vez. Elija uno.' });
     }
     if (hasPriceInput) {
         if (isNaN(finalPrecio) || finalPrecio <= 0) {
-            if (req.file) {
-                console.log('UPDATE PRODUCT DEBUG: Precio inválido, intentando eliminar archivo:', req.file.filename); 
-                await fs.unlink(path.join(IMAGES_UPLOAD_PATH, req.file.filename)).catch(err => console.error("Error al eliminar imagen subida por validación (precio inválido):", err));
-            }
+            await cleanUploadedFileOnError(req.file);
             return res.status(400).json({ error: 'El precio debe ser un número positivo.' });
         }
     }
     if (hasPointsInput) {
         if (isNaN(finalPuntosCanje) || finalPuntosCanje < 0) {
-            if (req.file) {
-                console.log('UPDATE PRODUCT DEBUG: Puntos inválidos, intentando eliminar archivo:', req.file.filename); 
-                await fs.unlink(path.join(IMAGES_UPLOAD_PATH, req.file.filename)).catch(err => console.error("Error al eliminar imagen subida por validación (puntos inválidos):", err));
-            }
+            await cleanUploadedFileOnError(req.file);
             return res.status(400).json({ error: 'Los puntos de canje deben ser un número no negativo.' });
         }
     }
-    if (stock !== undefined && (isNaN(parseInt(stock)) || parseInt(stock) < 0)) {
-        if (req.file) {
-            console.log('UPDATE PRODUCT DEBUG: Stock inválido, intentando eliminar archivo:', req.file.filename); 
-            await fs.unlink(path.join(IMAGES_UPLOAD_PATH, req.file.filename)).catch(err => console.error("Error al eliminar imagen subida por validación (stock inválido):", err));
-        }
+    const parsedStock = (stock !== undefined && stock !== null && stock !== '') ? parseInt(stock) : undefined;
+    if (stock !== undefined && (isNaN(parsedStock) || parsedStock < 0)) {
+        await cleanUploadedFileOnError(req.file);
         return res.status(400).json({ error: 'El stock debe ser un número no negativo.' });
     }
 
     try {
         console.log('UPDATE PRODUCT DEBUG: Buscando imagen_url actual para producto ID:', id); 
         const productResult = await pool.query('SELECT imagen_url FROM productos WHERE id = $1', [id]);
-        const currentImageUrl = productResult.rows[0] ? productResult.rows[0].imagen_url : null;
-        console.log('UPDATE PRODUCT DEBUG: currentImageUrl desde DB:', currentImageUrl); 
+        if (productResult.rows.length === 0) {
+            await cleanUploadedFileOnError(req.file); 
+            return res.status(404).json({ error: 'Producto no encontrado.' });
+        }
+        const currentImageUrl = productResult.rows[0].imagen_url; 
+
+        console.log('UPDATE PRODUCT DEBUG: currentImageUrl desde DB (producto existente):', currentImageUrl); 
         
-        if (req.file) { // Si se subió un nuevo archivo de imagen
+        if (req.file) { 
             new_imagen_url = `/api/images/${req.file.filename}`; 
-            console.log('UPDATE PRODUCT DEBUG: Nueva imagen subida. new_imagen_url:', new_imagen_url); 
+            console.log('UPDATE PRODUCT DEBUG: Nueva imagen subida detectada. new_imagen_url:', new_imagen_url); 
             if (currentImageUrl && currentImageUrl.startsWith('/api/images/')) {
-                const oldImagePath = path.join(IMAGES_UPLOAD_PATH, currentImageUrl.replace('/api/images/', ''));
+                const oldImagePath = path.join(IMAGES_UPLOAD_PATH, path.basename(currentImageUrl)); 
                 console.log('UPDATE PRODUCT DEBUG: Intentando eliminar imagen antigua:', oldImagePath); 
                 await fs.unlink(oldImagePath).catch(err => console.error("Error al eliminar imagen antigua (update):", err));
             }
-        } else if (req.body.imagen_url_clear === 'true') { // Si se marcó la opción de limpiar imagen
-            new_imagen_url = null;
-            console.log('UPDATE PRODUCT DEBUG: Solicitud para limpiar imagen. new_imagen_url:', new_imagen_url); 
+        } else if (imagen_url_clear === 'true') { 
+            new_imagen_url = null; 
+            console.log('UPDATE PRODUCT DEBUG: Solicitud para limpiar imagen detectada. new_imagen_url:', new_imagen_url); 
             if (currentImageUrl && currentImageUrl.startsWith('/api/images/')) {
-                const oldImagePath = path.join(IMAGES_UPLOAD_PATH, currentImageUrl.replace('/api/images/', ''));
+                const oldImagePath = path.join(IMAGES_UPLOAD_PATH, path.basename(currentImageUrl));
                 console.log('UPDATE PRODUCT DEBUG: Intentando eliminar imagen por solicitud del cliente:', oldImagePath); 
                 await fs.unlink(oldImagePath).catch(err => console.error("Error al eliminar imagen por solicitud del cliente (update):", err));
             }
-        } else { // Si no se subió nueva imagen ni se marcó para limpiar
+        } else { 
             new_imagen_url = currentImageUrl;
             console.log('UPDATE PRODUCT DEBUG: No hay nueva imagen ni solicitud de limpieza. Manteniendo imagen actual:', new_imagen_url); 
         }
+
+        console.log('UPDATE PRODUCT DEBUG: Valor FINAL de new_imagen_url antes de la consulta a la DB:', new_imagen_url); 
 
         const fields = [];
         const values = [];
@@ -233,13 +235,14 @@ exports.updateProduct = async (req, res) => {
         
         if (hasPriceInput) {
             fields.push(`precio = $${queryIndex++}`); values.push(finalPrecio);
-            fields.push(`puntos_canje = $${queryIndex++}`); values.push(null);
+            fields.push(`puntos_canje = $${queryIndex++}`); values.push(null); 
         } else if (hasPointsInput) {
             fields.push(`puntos_canje = $${queryIndex++}`); values.push(finalPuntosCanje);
-            fields.push(`precio = $${queryIndex++}`); values.push(null);
+            fields.push(`precio = $${queryIndex++}`); values.push(null); 
         }
 
-        if (stock !== undefined) { fields.push(`stock = $${queryIndex++}`); values.push(parseInt(stock)); }
+        if (stock !== undefined && parsedStock !== undefined) { fields.push(`stock = $${queryIndex++}`); values.push(parsedStock); }
+        
         fields.push(`imagen_url = $${queryIndex++}`); values.push(new_imagen_url); 
         
         if (unidad_de_medida !== undefined) { fields.push(`unidad_de_medida = $${queryIndex++}`); values.push(unidad_de_medida); }
@@ -247,38 +250,32 @@ exports.updateProduct = async (req, res) => {
         if (disponible !== undefined) { fields.push(`disponible = $${queryIndex++}`); values.push(disponible); }
 
         if (fields.length === 0) {
-            if (req.file) {
-                console.log('UPDATE PRODUCT DEBUG: No hay campos para actualizar, intentando eliminar archivo subido:', req.file.filename); 
-                await fs.unlink(path.join(IMAGES_UPLOAD_PATH, req.file.filename)).catch(err => console.error("Error al eliminar imagen subida sin otros campos de update:", err));
-            }
+            await cleanUploadedFileOnError(req.file);
             return res.status(400).json({ error: 'No se proporcionaron campos para actualizar.' });
         }
 
-        values.push(id);
+        values.push(id); 
         const updateQuery = `UPDATE productos SET ${fields.join(', ')} WHERE id = $${queryIndex} RETURNING *`;
 
         console.log('UPDATE PRODUCT DEBUG: Ejecutando UPDATE en DB. Query:', updateQuery, 'Values:', values); 
         const result = await pool.query(updateQuery, values);
 
         if (result.rows.length === 0) {
-            if (req.file) {
-                console.log('UPDATE PRODUCT DEBUG: Producto no encontrado para update, intentando eliminar archivo subido:', req.file.filename); 
-                await fs.unlink(path.join(IMAGES_UPLOAD_PATH, req.file.filename)).catch(err => console.error("Error al eliminar imagen subida por producto no encontrado (update):", err));
-            }
+            await cleanUploadedFileOnError(req.file); 
             return res.status(404).json({ error: 'Producto no encontrado.' });
         }
         console.log('UPDATE PRODUCT DEBUG: Producto actualizado en DB. Resultado:', result.rows[0]); 
         res.status(200).json({ product: result.rows[0], message: 'Producto actualizado exitosamente.' });
     } catch (err) {
         console.error('UPDATE PRODUCT ERROR: Error al actualizar producto en DB:', err); 
-        if (req.file) {
-            console.log('UPDATE PRODUCT DEBUG: Intentando eliminar archivo por fallo de DB (update):', req.file.filename); 
-            await fs.unlink(path.join(IMAGES_UPLOAD_PATH, req.file.filename)).catch(unlinkErr => console.error("Error al eliminar imagen subida por fallo de DB (update):", unlinkErr));
-        }
+        await cleanUploadedFileOnError(req.file); 
         res.status(500).json({ error: 'Error interno del servidor al actualizar el producto.' });
     }
 };
 
+// @desc    Eliminar un producto
+// @route   DELETE /api/products/:id
+// @access  Private (Admin)
 exports.deleteProduct = async (req, res) => {
     const { id } = req.params;
     console.log('DELETE PRODUCT DEBUG: Iniciando deleteProduct para ID:', id); 
@@ -297,7 +294,8 @@ exports.deleteProduct = async (req, res) => {
         console.log('DELETE PRODUCT DEBUG: Producto eliminado de DB. Resultado:', result.rows[0]); 
 
         if (imageUrlToDelete && imageUrlToDelete.startsWith('/api/images/')) {
-            const imagePath = path.join(IMAGES_UPLOAD_PATH, imageUrlToDelete.replace('/api/images/', ''));
+            const imageFilename = path.basename(imageUrlToDelete); 
+            const imagePath = path.join(IMAGES_UPLOAD_PATH, imageFilename);
             console.log('DELETE PRODUCT DEBUG: Intentando eliminar archivo de imagen físico:', imagePath); 
             await fs.unlink(imagePath).catch(err => console.error("Error al eliminar archivo de imagen (delete):", err)); 
         }
@@ -305,6 +303,7 @@ exports.deleteProduct = async (req, res) => {
         res.status(200).json({ message: 'Producto eliminado exitosamente.' });
     } catch (err) {
         console.error('DELETE PRODUCT ERROR: Error al eliminar producto en DB:', err); 
+        await cleanUploadedFileOnError(req.file); 
         res.status(500).json({ error: 'Error interno del servidor al eliminar el producto.' });
     }
 };

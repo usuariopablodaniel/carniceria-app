@@ -8,7 +8,7 @@ const cors = require('cors');
 const passport = require('passport');
 const session = require('express-session');
 const path = require('path');
-const fs = require('fs/promises');
+const fs = require('fs/promises'); 
 
 console.log('Cargando configuración de Passport...');
 require('./config/passport'); 
@@ -16,16 +16,23 @@ require('./config/passport');
 const app = express();
 const port = process.env.PORT || 5000;
 
-const UPLOADS_BASE_PATH = path.join('C:', 'Users', 'pablo', 'Pictures', 'uploads');
+// Ruta de uploads (la que hemos acordado usar fuera de OneDrive)
+const UPLOADS_BASE_PATH = path.join('C:', 'temp', 'uploads');
 const IMAGES_UPLOAD_PATH = path.join(UPLOADS_BASE_PATH, 'imagenes');
 console.log(`Ruta absoluta de imágenes de uploads: ${IMAGES_UPLOAD_PATH}`);
 
-const pool = require('./db'); // Importar el pool desde el nuevo archivo db.js
+// Asegúrate de que la carpeta de destino exista.
+fs.mkdir(IMAGES_UPLOAD_PATH, { recursive: true })
+    .then(() => console.log(`Carpeta de uploads asegurada: ${IMAGES_UPLOAD_PATH}`))
+    .catch(err => console.error(`Error al asegurar la carpeta de uploads: ${IMAGES_UPLOAD_PATH}`, err));
+
+
+const pool = require('./db'); 
 
 // *** Importaciones de Rutas ***
 console.log('Importando rutas...');
 const authRoutes = require('./routes/auth');
-const productRoutes = require('./routes/productRoutes');
+const productRoutes = require('./routes/productRoutes'); 
 const transactionRoutes = require('./routes/transactionRoutes'); 
 const notificationRoutes = require('./routes/notifications'); 
 
@@ -35,8 +42,6 @@ app.use(cors({
     origin: 'http://localhost:3000', 
     credentials: true 
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true })); 
 
 console.log('Configurando sesiones para Passport...');
 app.use(session({
@@ -51,11 +56,28 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // =======================================================
-// === USO DE RUTAS DE API (todas las rutas, incluyendo Google, bajo /api/auth) ===
+// === USO DE RUTAS DE API ===
 // =======================================================
 console.log('Configurando rutas de API...');
+
+// >>>>>>>>>>>>>>> ESTO ES CRÍTICO Y CORRECTO PARA MULTER <<<<<<<<<<<<<<<<
+// Las rutas de Productos (que usan Multer) se definen PRIMERO.
+// Multer se aplica DENTRO de productRoutes.js, y al estar esta línea antes
+// de express.json/urlencoded, Multer tendrá la oportunidad de procesar
+// el 'multipart/form-data' antes de que el body sea consumido.
+app.use('/api/products', (req, res, next) => { console.log('MIDDLEWARE: /api/products'); next(); }, productRoutes);
+
+// >>>>>>>>>>>>>>> ESTO ES CRÍTICO Y CORRECTO PARA JSON/URL-ENCODED <<<<<<<<<<<<<<<<
+// express.json() y express.urlencoded() se aplican DESPUÉS de las rutas de productos.
+// Esto significa que Multer ya procesó el body para /api/products.
+// Para las demás rutas (auth, transactions, notifications), estos middlewares
+// se ejecutarán y parsearán los bodies JSON o URL-encoded correctamente.
+app.use(express.json()); 
+app.use(express.urlencoded({ extended: true })); 
+// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+// Rutas que esperan JSON o URL-encoded bodies
 app.use('/api/auth', (req, res, next) => { console.log('MIDDLEWARE: /api/auth'); next(); }, authRoutes);
-app.use('/api/products', (req, res, next) => { console.log('MIDDLEWARE: /api/products'); next(); }, productRoutes); 
 app.use('/api/transactions', (req, res, next) => { console.log('MIDDLEWARE: /api/transactions'); next(); }, transactionRoutes); 
 app.use('/api/notifications', (req, res, next) => { console.log('MIDDLEWARE: /api/notifications'); next(); }, notificationRoutes); 
 // =======================================================
@@ -64,33 +86,16 @@ app.use('/api/notifications', (req, res, next) => { console.log('MIDDLEWARE: /ap
 // === CONFIGURACIÓN PARA SERVIR ARCHIVOS ESTATICOS ===
 // =======================================================
 console.log('Configurando middleware para servir imágenes estáticas en /api/images...');
-app.use('/api/images', (req, res, next) => {
-    console.log(`MIDDLEWARE: Solicitud a /api/images. URL original: ${req.originalUrl}`);
-    
-    const fileName = req.url.startsWith('/api/images/') ? req.url.replace('/api/images/', '') : req.url;
-    const decodedFileName = decodeURIComponent(fileName); 
-
-    const fullImagePath = path.join(IMAGES_UPLOAD_PATH, decodedFileName); 
-
-    fs.access(fullImagePath, fs.constants.F_OK)
-        .then(() => {
-            console.log(`MIDDLEWARE: Archivo de imagen encontrado: ${fullImagePath}`);
-            next(); 
-        })
-        .catch((err) => {
-            console.error(`ERROR: Archivo de imagen NO ENCONTRADO en el disco: ${fullImagePath}. Error: ${err.message}`);
-            res.status(404).json({ error: 'Imagen no encontrada en el servidor.' });
-        });
-}, express.static(IMAGES_UPLOAD_PATH, {
+app.use('/api/images', express.static(IMAGES_UPLOAD_PATH, {
     setHeaders: function (res, path, stat) {
         console.log(`MIDDLEWARE: express.static sirviendo: ${path}`);
-        res.set('Cache-Control', 'no-store'); 
+        res.set('Cache-Control', 'no-cache'); 
     },
     fallthrough: false 
 }));
 
 app.use('/api/images', (req, res) => {
-    console.error(`ERROR: Fallback de /api/images alcanzado. Algo salió mal al servir la imagen.`);
+    console.error(`ERROR: Fallback de /api/images alcanzado. Esto indica un problema con express.static.`);
     res.status(500).json({ error: 'Error interno al servir la imagen.' });
 });
 // =======================================================
