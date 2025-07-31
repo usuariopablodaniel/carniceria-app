@@ -1,51 +1,60 @@
 // frontend/src/components/AppNavbar.js
-import React from 'react';
-import { Navbar, Nav, Button, Container } from 'react-bootstrap'; 
+import React, { useState } from 'react';
+import { Navbar, Nav, Button, Container } from 'react-bootstrap';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const AppNavbar = () => {
     const { isAuthenticated, user, logout } = useAuth();
     const navigate = useNavigate();
+    const [showMenu, setShowMenu] = useState(false);
 
-    // Aquí podemos verificar si el usuario es administrador de manera sencilla
     const isAdmin = isAuthenticated && user && user.role === 'admin';
+    const isEmployee = isAuthenticated && user && user.role === 'employee'; // Mantener para Escanear QR
 
     const handleLogout = () => {
         logout();
         navigate('/login');
+        setShowMenu(false);
     };
 
+    const closeMenu = () => setShowMenu(false);
+
+    const brandNavLinkTo = isAuthenticated ? "/dashboard" : "/";
+
     return (
-        <Navbar bg="dark" variant="dark" expand="lg" className="shadow-sm">
+        <Navbar bg="dark" variant="dark" expand="lg" className="shadow-sm" expanded={showMenu}>
             <Container>
-                <Navbar.Brand as={NavLink} to="/">Carnicería App</Navbar.Brand>
-                <Navbar.Toggle aria-controls="basic-navbar-nav" />
+                <Navbar.Brand as={NavLink} to={brandNavLinkTo} onClick={closeMenu}>
+                    Carnicería App
+                </Navbar.Brand>
+
+                <Navbar.Toggle aria-controls="basic-navbar-nav" onClick={() => setShowMenu(!showMenu)} />
+                
                 <Navbar.Collapse id="basic-navbar-nav">
                     <Nav className="me-auto">
-                        {/* Enlaces siempre visibles o condicionales para todos los usuarios */}
-                        {/* 'Ofertas' será la página principal de productos en venta */}
-                        <Nav.Link as={NavLink} to="/products" className="text-white">Ofertas</Nav.Link>
+                        <Nav.Link as={NavLink} to="/products" className="text-white" onClick={closeMenu}>Ofertas</Nav.Link>
                         
-                        {/* 'Canje por Puntos' visible para todos los usuarios */}
-                        <Nav.Link as={NavLink} to="/redemption-products" className="text-white">Canje por Puntos</Nav.Link>
+                        <Nav.Link as={NavLink} to="/redemption-products" className="text-white" onClick={closeMenu}>Canje por Puntos</Nav.Link>
 
-                        {/* Enlaces visibles solo para ADMINISTRADORES o EMPLEADOS */}
-                        {isAuthenticated && user && (user.role === 'admin' || user.role === 'employee') && (
-                            <>
-                                <Nav.Link as={NavLink} to="/products/add" className="text-white">Añadir Producto</Nav.Link>
-                                <Nav.Link as={NavLink} to="/scan-qr" className="text-white">Escanear QR</Nav.Link> 
-                            </>
+                        {/* Enlace "Añadir Producto" - Visible SOLO para ADMINISTRADORES */}
+                        {isAdmin && (
+                            <Nav.Link as={NavLink} to="/products/add" className="text-white" onClick={closeMenu}>Añadir Producto</Nav.Link>
                         )}
                         
-                        {/* >>>>>>>>>>>>> Enlace de Gestión de Usuarios (SOLO ADMIN) <<<<<<<<<<<<< */}
+                        {/* Enlace "Escanear QR" - Visible para ADMINISTRADORES o EMPLEADOS */}
+                        {(isAdmin || isEmployee) && (
+                            <Nav.Link as={NavLink} to="/scan-qr" className="text-white" onClick={closeMenu}>Escanear QR</Nav.Link>
+                        )}
+                        
+                        {/* Enlace de Gestión de Usuarios (SOLO ADMIN) */}
                         {isAdmin && (
-                            <Nav.Link as={NavLink} to="/users" className="text-white">Gestión de Usuarios</Nav.Link>
+                            <Nav.Link as={NavLink} to="/users" className="text-white" onClick={closeMenu}>Gestión de Usuarios</Nav.Link>
                         )}
 
                         {/* Enlace al Dashboard, visible para cualquier usuario autenticado */}
                         {isAuthenticated && (
-                            <Nav.Link as={NavLink} to="/dashboard" className="text-white">Dashboard</Nav.Link>
+                            <Nav.Link as={NavLink} to="/dashboard" className="text-white" onClick={closeMenu}>Dashboard</Nav.Link>
                         )}
                     </Nav>
                     <Nav>
@@ -53,7 +62,6 @@ const AppNavbar = () => {
                         {isAuthenticated ? (
                             <>
                                 <Navbar.Text className="text-white me-3">
-                                    {/* Mostrar el nombre del usuario si existe, si no, 'Usuario' */}
                                     Hola, {user ? user.nombre || user.name : 'Usuario'}! 
                                 </Navbar.Text>
                                 <Button variant="outline-light" onClick={handleLogout}>
@@ -65,13 +73,13 @@ const AppNavbar = () => {
                                 <Button 
                                     variant="outline-light" 
                                     className="me-2" 
-                                    onClick={() => navigate('/login')}
+                                    onClick={() => { navigate('/login'); closeMenu(); }}
                                 >
                                     Iniciar Sesión
                                 </Button>
                                 <Button 
                                     variant="light" 
-                                    onClick={() => navigate('/register')}
+                                    onClick={() => { navigate('/register'); closeMenu(); }}
                                 >
                                     Registrarse
                                 </Button>
@@ -85,3 +93,4 @@ const AppNavbar = () => {
 };
 
 export default AppNavbar;
+
