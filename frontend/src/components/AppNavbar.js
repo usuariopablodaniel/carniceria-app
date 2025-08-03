@@ -10,7 +10,7 @@ const AppNavbar = () => {
     const [showMenu, setShowMenu] = useState(false);
 
     const isAdmin = isAuthenticated && user && user.role === 'admin';
-    const isEmployee = isAuthenticated && user && user.role === 'employee'; // Mantener para Escanear QR
+    const isEmployee = isAuthenticated && user && user.role === 'employee';
 
     const handleLogout = () => {
         logout();
@@ -36,7 +36,7 @@ const AppNavbar = () => {
                         <Nav.Link as={NavLink} to="/products" className="text-white" onClick={closeMenu}>Ofertas</Nav.Link>
                         
                         <Nav.Link as={NavLink} to="/redemption-products" className="text-white" onClick={closeMenu}>Canje por Puntos</Nav.Link>
-
+                        
                         {/* Enlace "Añadir Producto" - Visible SOLO para ADMINISTRADORES */}
                         {isAdmin && (
                             <Nav.Link as={NavLink} to="/products/add" className="text-white" onClick={closeMenu}>Añadir Producto</Nav.Link>
@@ -58,6 +58,9 @@ const AppNavbar = () => {
                         )}
                     </Nav>
                     <Nav>
+                        {/* >>>>> Enlace de Contacto movido a esta sección final <<<<< */}
+                        <Nav.Link as={NavLink} to="/contact" className="text-white" onClick={closeMenu}>Contacto</Nav.Link>
+                        
                         {/* Botones de autenticación */}
                         {isAuthenticated ? (
                             <>

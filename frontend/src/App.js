@@ -1,5 +1,5 @@
 // frontend/src/App.js
-import React, { useState, useEffect } from 'react'; 
+import React, { useState, useEffect } from 'react';
 import './App.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
@@ -7,25 +7,26 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import AppNavbar from './components/AppNavbar';
 
 import { AuthProvider } from './context/AuthContext';
-import PrivateRoute from './routes/PrivateRoute'; 
+import PrivateRoute from './routes/PrivateRoute';
 
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import ProductAddPage from './pages/ProductAddPage';
-// >>>>>>>>>>>>>>> CORRECCIÓN DE RUTA AQUÍ <<<<<<<<<<<<<<<<
-import ProductListPage from './pages/ProductListPage'; // Ruta corregida: quitado el 'pages/' extra
-// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+import ProductListPage from './pages/ProductListPage';
 import RegisterPage from './pages/RegisterPage';
-import GoogleAuthCallback from './pages/GoogleAuthCallback'; 
-import ProductEditPage from './pages/ProductEditPage'; 
-import RedemptionProductsPage from './pages/RedemptionProductsPage'; 
-import ScanQRPage from './pages/ScanQRPage'; 
+import GoogleAuthCallback from './pages/GoogleAuthCallback';
+import ProductEditPage from './pages/ProductEditPage';
+import RedemptionProductsPage from './pages/RedemptionProductsPage';
+import ScanQRPage from './pages/ScanQRPage';
+import UserManagementPage from './pages/UserManagementPage';
+import GeneralNotificationBanner from './components/GeneralNotificationBanner';
+import api from './api/axios';
+import ContactPage from './pages/ContactPage';
 
-import UserManagementPage from './pages/UserManagementPage'; 
-
-import GeneralNotificationBanner from './components/GeneralNotificationBanner'; 
-import api from './api/axios'; // Usar la instancia 'api' de axios, no 'axios' directamente
+// Importaciones de los nuevos componentes de restablecimiento de contraseña
+import PasswordResetRequestPage from './pages/PasswordResetRequestPage';
+import ResetPasswordPage from './pages/ResetPasswordPage'; 
 
 function App() {
     const [generalNotificationMessage, setGeneralNotificationMessage] = useState(null);
@@ -33,22 +34,20 @@ function App() {
     useEffect(() => {
         const fetchGeneralNotification = async () => {
             try {
-                const response = await api.get('/notifications/general'); 
+                const response = await api.get('/notifications/general');
                 
                 if (response.data && response.data.isActive && response.data.message) {
                     setGeneralNotificationMessage(response.data.message);
                 } else {
-                    setGeneralNotificationMessage(null); 
+                    setGeneralNotificationMessage(null);
                 }
             } catch (error) {
                 console.error("Error al obtener la notificación general:", error);
-                setGeneralNotificationMessage(null); 
+                setGeneralNotificationMessage(null);
             }
         };
-
         fetchGeneralNotification();
-
-    }, []); 
+    }, []);
 
     return (
         <Router>
@@ -68,6 +67,13 @@ function App() {
                             
                             <Route path="/products" element={<ProductListPage />} />
                             <Route path="/redemption-products" element={<RedemptionProductsPage />} />
+                            <Route path="/contact" element={<ContactPage />} />
+
+                            {/* Ruta para solicitar el restablecimiento de contraseña */}
+                            <Route path="/password-reset-request" element={<PasswordResetRequestPage />} />
+
+                            {/* Ruta para establecer la nueva contraseña (incluye el token) */}
+                            <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
 
                             <Route
                                 path="/dashboard"
@@ -86,7 +92,7 @@ function App() {
                                 }
                             />
                             <Route
-                                path="/products/edit/:id" 
+                                path="/products/edit/:id"
                                 element={
                                     <PrivateRoute>
                                         <ProductEditPage />
@@ -94,14 +100,13 @@ function App() {
                                 }
                             />
                             <Route
-                                path="/scan-qr" 
+                                path="/scan-qr"
                                 element={
                                     <PrivateRoute>
                                         <ScanQRPage />
                                     </PrivateRoute>
                                 }
                             />
-
                             <Route
                                 path="/users"
                                 element={
@@ -110,7 +115,6 @@ function App() {
                                     </PrivateRoute>
                                 }
                             />
-                            
                         </Routes>
                     </main>
                 </div>

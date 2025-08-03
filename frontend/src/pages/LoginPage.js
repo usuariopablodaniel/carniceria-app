@@ -1,8 +1,9 @@
+// frontend/src/pages/LoginPage.js
 import React, { useState, useEffect } from 'react';
 import { Form, Button, Container, Row, Col, Alert } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import api from '../api/axios'; // Asegúrate de que esta importación sea correcta
+import api from '../api/axios';
 
 const LoginPage = () => {
   const { login } = useAuth();
@@ -64,10 +65,7 @@ const LoginPage = () => {
   };
 
   const handleGoogleLoginRedirect = () => {
-    // >>>>>>>>>>>>>>> ESTE LOG ES PARA VERIFICAR SI ESTE CÓDIGO SE ESTÁ EJECUTANDO <<<<<<<<<<<<<<<<
     console.log('DEBUG: Redirigiendo a Google con la URL:', 'http://localhost:5000/api/auth/google');
-    // Esta es la URL completa que el navegador debe cargar para iniciar el flujo de autenticación de Google.
-    // DEBE COINCIDIR CON app.use('/api/auth', authRoutes) en server.js y router.get('/google', ...) en auth.js
     window.location.href = 'http://localhost:5000/api/auth/google'; 
   };
 
@@ -99,6 +97,11 @@ const LoginPage = () => {
                 required
               />
             </Form.Group>
+            
+            <div className="text-end mb-3">
+              {/* CORRECCIÓN: El enlace ahora apunta a la ruta correcta */}
+              <Link to="/password-reset-request">¿Olvidaste tu contraseña?</Link>
+            </div>
 
             <Button
               variant="primary"

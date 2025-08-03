@@ -1,41 +1,51 @@
+// frontend/src/pages/ProductListPage.js
 import React, { useEffect, useState, useCallback } from 'react';
-import { Container, Row, Col, Spinner, Alert, Button, Card, Image } from 'react-bootstrap'; 
+import { Container, Row, Col, Spinner, Alert, Button, Card, Image, Modal } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import api from '../api/axios'; 
+import api from '../api/axios';
 
 const ProductListPage = () => {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [productToDelete, setProductToDelete] = useState(null);
     const { user } = useAuth();
     const navigate = useNavigate();
 
-    // Función auxiliar para construir la URL completa de la imagen
-    // 'api' es una constante, por lo que no necesita ser una dependencia de useCallback.
+    // Función de utilidad para renderizar valores de forma segura.
+    // Evita el error "Objects are not valid as a React child".
+    const renderSafeValue = useCallback((value, fallback = '') => {
+        if (typeof value === 'object' && value !== null) {
+            return fallback;
+        }
+        return value;
+    }, []);
+
     const getFullImageUrl = useCallback((relativePath) => {
         if (!relativePath) {
-            return null; 
+            return 'https://placehold.co/400x200/cccccc/000000?text=Sin+Imagen';
         }
         const baseUrlWithoutApi = api.defaults.baseURL.replace('/api', '');
         
         if (relativePath.startsWith('/api/images/')) {
-            return `${baseUrlWithoutApi}${relativePath}`; 
+            return `${baseUrlWithoutApi}${relativePath}`;
         } else {
-            return `${api.defaults.baseURL}/images/${relativePath}`; 
+            return `${api.defaults.baseURL}/images/${relativePath}`;
         }
-    }, []); // Eliminado 'api' de las dependencias de useCallback
+    }, []);
 
-    // 'api' es una constante, por lo que no necesita ser una dependencia de useCallback.
-    const fetchProducts = useCallback(async () => { 
+    const fetchProducts = async () => {
         setLoading(true);
         setError(null);
         try {
             const response = await api.get('/products');
-            const saleProducts = response.data.filter(product =>
-                product.precio !== null && product.precio !== undefined &&
-                (product.puntos_canje === null || product.puntos_canje === undefined)
-            );
+            const saleProducts = Array.isArray(response.data) ?
+                response.data.filter(product =>
+                    (renderSafeValue(product.precio) !== null && renderSafeValue(product.precio) !== undefined) &&
+                    (renderSafeValue(product.puntos_canje) === null || renderSafeValue(product.puntos_canje) === undefined)
+                ) : [];
             setProducts(saleProducts);
         } catch (err) {
             console.error("Error al obtener los productos:", err);
@@ -49,11 +59,11 @@ const ProductListPage = () => {
         } finally {
             setLoading(false);
         }
-    }, []); // Eliminado 'api' de las dependencias de useCallback
+    };
 
     useEffect(() => {
         fetchProducts();
-    }, [fetchProducts]); 
+    }, []);
 
     const handleAddProductClick = () => {
         navigate('/products/add');
@@ -62,18 +72,31 @@ const ProductListPage = () => {
     const handleEditProductClick = (productId) => {
         navigate(`/products/edit/${productId}`);
     };
+    
+    const handleDeleteProduct = (product) => {
+        setProductToDelete(product);
+        setShowDeleteModal(true);
+    };
 
-    const handleDeleteProduct = async (productId) => {
-        if (window.confirm('¿Estás seguro de que quieres eliminar este producto?')) {
-            try {
-                await api.delete(`/products/${productId}`);
-                console.log(`Producto con ID ${productId} eliminado.`);
-                fetchProducts(); 
-            } catch (err) {
-                console.error("Error al eliminar el producto:", err);
-                setError("No se pudo eliminar el producto. Intenta de nuevo.");
-            }
+    const confirmDeleteProduct = async () => {
+        try {
+            // Se usa productToDelete.id para coincidir con la respuesta del backend
+            await api.delete(`/products/${productToDelete.id}`); 
+            console.log(`Producto con ID ${productToDelete.id} eliminado.`);
+            setShowDeleteModal(false);
+            setProductToDelete(null);
+            fetchProducts();
+        } catch (err) {
+            console.error("Error al eliminar el producto:", err);
+            setShowDeleteModal(false);
+            setProductToDelete(null);
+            setError("No se pudo eliminar el producto. Intenta de nuevo.");
         }
+    };
+
+    const cancelDeleteProduct = () => {
+        setShowDeleteModal(false);
+        setProductToDelete(null);
     };
 
     if (error) {
@@ -90,8 +113,7 @@ const ProductListPage = () => {
     return (
         <Container className="my-5">
             <div className="d-flex justify-content-between align-items-center mb-4">
-                {/* eslint-disable-next-line jsx-a11y/heading-has-content */}
-                <h1 className="text-dark">Nuestras Ofertas y Productos en Venta</h1> 
+                <h1 className="text-dark">Nuestras Ofertas y Productos en Venta</h1>
                 {user && user.role === 'admin' && (
                     <Button variant="success" onClick={handleAddProductClick}>
                         + Añadir Producto
@@ -107,7 +129,8 @@ const ProductListPage = () => {
                     <p className="text-muted">Cargando productos, por favor espera...</p>
                     <Row className="mt-4 w-100 justify-content-center">
                         {Array.from({ length: 4 }).map((_, index) => (
-                            <Col key={index} xs={12} sm={6} md={4} lg={3} className="mb-4">
+                            // Se usa el index como key para los placeholders, ya que son estáticos
+                            <Col key={index} xs={12} sm={6} md={4} lg={3} className="mb-4"> 
                                 <div className="placeholder-glow">
                                     <div className="card h-100 shadow-sm rounded-lg" style={{ border: '1px solid #e0e0e0' }}>
                                         <div className="card-img-top bg-light" style={{ height: '180px', width: '100%' }}></div>
@@ -135,34 +158,39 @@ const ProductListPage = () => {
             ) : (
                 <Row xs={1} md={2} lg={3} className="g-4">
                     {products.map(product => (
-                        <Col key={product.id}>
+                        // Se usa product.id como key, ya que es el identificador único del backend
+                        <Col key={product.id}> 
                             <Card className="h-100 shadow-sm rounded-lg">
                                 <Image
                                     variant="top"
-                                    src={product.imagen_url ? getFullImageUrl(product.imagen_url) : 'https://placehold.co/400x200/cccccc/000000?text=Sin+Imagen'}
-                                    alt={product.nombre}
+                                    src={getFullImageUrl(product.imagen_url)}
+                                    alt={renderSafeValue(product.nombre, 'Producto sin nombre')}
                                     style={{ height: '200px', width: '100%', objectFit: 'cover' }}
                                     loading="lazy"
                                     onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/400x200/cccccc/000000?text=Error+Carga+Imagen'; }}
                                 />
                                 <Card.Body className="d-flex flex-column">
-                                    <Card.Title className="text-truncate" title={product.nombre}>{product.nombre}</Card.Title>
+                                    <Card.Title className="text-truncate" title={renderSafeValue(product.nombre, 'Producto sin nombre')}>
+                                        {renderSafeValue(product.nombre, 'Producto sin nombre')}
+                                    </Card.Title>
                                     <Card.Text className="text-muted small mb-2">
-                                        {product.descripcion || 'Sin descripción.'}
+                                        {renderSafeValue(product.descripcion) || 'Sin descripción.'}
                                     </Card.Text>
                                     <div className="mt-auto">
                                         <h5 className="text-primary mb-2">
-                                            ${product.precio !== null && product.precio !== undefined
-                                                ? parseFloat(product.precio).toFixed(2)
+                                            ${renderSafeValue(product.precio) !== null && renderSafeValue(product.precio) !== undefined
+                                                ? parseFloat(renderSafeValue(product.precio)).toFixed(2)
                                                 : 'N/A'
                                             }
                                         </h5>
                                         {user && user.role === 'admin' && (
                                             <div className="d-flex justify-content-between mt-3">
+                                                {/* Se pasa product.id para la edición */}
                                                 <Button variant="warning" size="sm" onClick={() => handleEditProductClick(product.id)} className="me-2 flex-grow-1">
                                                     Editar
                                                 </Button>
-                                                <Button variant="danger" size="sm" onClick={() => handleDeleteProduct(product.id)} className="flex-grow-1">
+                                                {/* Se pasa el objeto product completo para el modal de eliminación */}
+                                                <Button variant="danger" size="sm" onClick={() => handleDeleteProduct(product)} className="flex-grow-1">
                                                     Eliminar
                                                 </Button>
                                             </div>
@@ -174,6 +202,24 @@ const ProductListPage = () => {
                     ))}
                 </Row>
             )}
+
+            {/* Modal de confirmación de eliminación */}
+            <Modal show={showDeleteModal} onHide={cancelDeleteProduct} centered>
+                <Modal.Header closeButton>
+                    <Modal.Title>Confirmar Eliminación</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    ¿Estás seguro de que quieres eliminar el producto <strong>{productToDelete?.nombre || ''}</strong>? Esta acción no se puede deshacer.
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={cancelDeleteProduct}>
+                        Cancelar
+                    </Button>
+                    <Button variant="danger" onClick={confirmDeleteProduct}>
+                        Eliminar
+                    </Button>
+                </Modal.Footer>
+            </Modal>
         </Container>
     );
 };
