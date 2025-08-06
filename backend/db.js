@@ -2,7 +2,7 @@
 const { Pool } = require('pg');
 require('dotenv').config(); // Asegúrate de cargar las variables de entorno aquí también si no lo haces globalmente
 
-console.log('Configurando pool de PostgreSQL en db.js...');
+// console.log('Configurando pool de PostgreSQL en db.js...'); // Eliminado
 
 const pool = new Pool({
     user: process.env.DB_USER,

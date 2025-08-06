@@ -49,7 +49,7 @@ const sendPasswordResetEmail = async (toEmail, resetUrl) => {
 
     try {
         await transporter.sendMail(mailOptions);
-        console.log(`Email de restablecimiento de contraseña enviado a ${toEmail}`);
+        // console.log(`Email de restablecimiento de contraseña enviado a ${toEmail}`); // Eliminado
     } catch (error) {
         console.error('Error al enviar el email:', error);
         throw new Error('No se pudo enviar el correo de restablecimiento.');

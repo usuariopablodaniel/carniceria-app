@@ -33,10 +33,10 @@ const ScanQRPage = () => {
     useEffect(() => {
         if (loadingAuth) return;
         if (!isAuthenticated || (user && user.role !== 'admin' && user.role !== 'employee')) {
-            console.log("ScanQRPage: Redirigiendo - Usuario no autorizado o no autenticado.");
+            // console.log("ScanQRPage: Redirigiendo - Usuario no autorizado o no autenticado."); // Eliminado
             navigate('/dashboard', { replace: true });
         } else {
-            console.log("ScanQRPage: Usuario autorizado. Rol:", user.role);
+            // console.log("ScanQRPage: Usuario autorizado. Rol:", user.role); // Eliminado
         }
     }, [user, isAuthenticated, loadingAuth, navigate]);
 
@@ -46,11 +46,11 @@ const ScanQRPage = () => {
             setLoadingRedemptionProducts(true);
             setRedemptionError('');
             try {
-                console.log("ScanQRPage: Cargando productos de canje...");
+                // console.log("ScanQRPage: Cargando productos de canje..."); // Eliminado
                 const response = await axios.get('/products');
                 const redeemable = response.data.filter(p => p.puntos_canje !== null && p.puntos_canje > 0);
                 setRedemptionProducts(redeemable);
-                console.log("ScanQRPage: Productos de canje cargados:", redeemable);
+                // console.log("ScanQRPage: Productos de canje cargados:", redeemable); // Eliminado
             } catch (err) {
                 console.error('ScanQRPage: Error al cargar productos de canje:', err);
                 setRedemptionError('No se pudieron cargar los productos de canje.');
@@ -64,10 +64,10 @@ const ScanQRPage = () => {
 
     // Función que se llama cuando se escanea un QR, memoizada con useCallback
     const onNewScanResult = useCallback(async (decodedText, decodedResult) => {
-        console.log(`ScanQRPage: QR Code scanned = ${decodedText}`);
+        // console.log(`ScanQRPage: QR Code scanned = ${decodedText}`); // Eliminado
         // Desmontar el escáner inmediatamente
         setScannerActive(false); 
-        console.log("ScanQRPage: Escáner pausado (componente desmontado).");
+        // console.log("ScanQRPage: Escáner pausado (componente desmontado)."); // Eliminado
 
         setMessage('');
         setError('');
@@ -81,15 +81,15 @@ const ScanQRPage = () => {
 
         // Intentar obtener el nombre del usuario escaneado
         try {
-            console.log(`ScanQRPage: Intentando obtener nombre para userId: ${decodedText}`);
+            // console.log(`ScanQRPage: Intentando obtener nombre para userId: ${decodedText}`); // Eliminado
             const response = await axios.get(`/auth/user/${decodedText}`); 
-            console.log("ScanQRPage: Respuesta de /auth/user/:id:", response.data);
+            // console.log("ScanQRPage: Respuesta de /auth/user/:id:", response.data); // Eliminado
             if (response.data && response.data.user) {
                 setScannedUserName(response.data.user.nombre || response.data.user.name || `ID: ${decodedText}`);
-                console.log("ScanQRPage: Nombre de usuario escaneado:", response.data.user.nombre || response.data.user.name);
+                // console.log("ScanQRPage: Nombre de usuario escaneado:", response.data.user.nombre || response.data.user.name); // Eliminado
             } else {
                 setScannedUserName(`ID: ${decodedText}`);
-                console.log("ScanQRPage: No se encontró nombre en la respuesta, mostrando solo ID.");
+                // console.log("ScanQRPage: No se encontró nombre en la respuesta, mostrando solo ID."); // Eliminado
             }
         } catch (fetchUserError) {
             console.error('ScanQRPage: Error al obtener nombre de usuario escaneado:', fetchUserError.response ? fetchUserError.response.data : fetchUserError.message);
@@ -106,7 +106,7 @@ const ScanQRPage = () => {
         setMessage('');
         setError('');
         setIsProcessingPurchase(true);
-        console.log("ScanQRPage: Iniciando registro de compra.");
+        // console.log("ScanQRPage: Iniciando registro de compra."); // Eliminado
 
         if (!scannedUserId) {
             setError('Por favor, escanea un código QR de usuario primero.');
@@ -120,7 +120,7 @@ const ScanQRPage = () => {
         }
 
         try {
-            console.log(`ScanQRPage: Enviando compra para userId: ${scannedUserId}, monto: ${parseFloat(amount)}`);
+            // console.log(`ScanQRPage: Enviando compra para userId: ${scannedUserId}, monto: ${parseFloat(amount)}`); // Eliminado
             const response = await axios.post('/transactions/purchase', {
                 userId: scannedUserId,
                 amount: parseFloat(amount)
@@ -131,7 +131,7 @@ const ScanQRPage = () => {
                 setAmount('');
                 setScannedUserId(null); 
                 setScannedUserName('');
-                console.log("ScanQRPage: Compra registrada con éxito.");
+                // console.log("ScanQRPage: Compra registrada con éxito."); // Eliminado
             } else {
                 setError(response.data.error || 'Error desconocido al registrar la compra.');
                 console.error("ScanQRPage: Error al registrar compra (respuesta no 200):", response.data);
@@ -148,7 +148,7 @@ const ScanQRPage = () => {
             // Introduce un pequeño retraso antes de volver a montar el escáner
             setTimeout(() => {
                 setScannerActive(true); 
-                console.log("ScanQRPage: Proceso de compra finalizado. Escáner reactivado después de retraso.");
+                // console.log("ScanQRPage: Proceso de compra finalizado. Escáner reactivado después de retraso."); // Eliminado
             }, 500); // 500ms de retraso
         }
     };
@@ -159,7 +159,7 @@ const ScanQRPage = () => {
         setError('');
         setRedemptionError('');
         setIsProcessingRedemption(true);
-        console.log("ScanQRPage: Iniciando registro de canje.");
+        // console.log("ScanQRPage: Iniciando registro de canje."); // Eliminado
 
         if (!scannedUserId) {
             setRedemptionError('Por favor, escanea un código QR de usuario primero.');
@@ -173,7 +173,7 @@ const ScanQRPage = () => {
         }
 
         try {
-            console.log(`ScanQRPage: Enviando canje para userId: ${scannedUserId}, puntos: ${selectedRedemptionPoints}, productId: ${selectedRedemptionProduct}`);
+            // console.log(`ScanQRPage: Enviando canje para userId: ${scannedUserId}, puntos: ${selectedRedemptionPoints}, productId: ${selectedRedemptionProduct}`); // Eliminado
             const response = await axios.post('/transactions/redeem', {
                 userId: scannedUserId,
                 pointsToRedeem: selectedRedemptionPoints,
@@ -186,7 +186,7 @@ const ScanQRPage = () => {
                 setSelectedRedemptionPoints(0);
                 setScannedUserId(null); 
                 setScannedUserName('');
-                console.log("ScanQRPage: Canje registrado con éxito.");
+                // console.log("ScanQRPage: Canje registrado con éxito."); // Eliminado
             } else {
                 setRedemptionError(response.data.error || 'Error desconocido al registrar el canje.');
                 console.error("ScanQRPage: Error al registrar canje (respuesta no 200):", response.data);
@@ -203,7 +203,7 @@ const ScanQRPage = () => {
             // Introduce un pequeño retraso antes de volver a montar el escáner
             setTimeout(() => {
                 setScannerActive(true); 
-                console.log("ScanQRPage: Proceso de canje finalizado. Escáner reactivado después de retraso.");
+                // console.log("ScanQRPage: Proceso de canje finalizado. Escáner reactivado después de retraso."); // Eliminado
             }, 500); // 500ms de retraso
         }
     };
@@ -229,7 +229,7 @@ const ScanQRPage = () => {
         setMessage('');
         setError('');
         setRedemptionError('');
-        console.log("ScanQRPage: Botón 'Activar Escáner' presionado. Escáner reactivado y campos limpiados.");
+        // console.log("ScanQRPage: Botón 'Activar Escáner' presionado. Escáner reactivado y campos limpiados."); // Eliminado
     };
 
 

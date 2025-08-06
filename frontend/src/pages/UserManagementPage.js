@@ -24,7 +24,7 @@ const UserManagementPage = () => {
             const date = new Date(dateString);
             return date.toLocaleDateString('es-ES');
         } catch (error) {
-            console.error("Error formatting date:", error);
+            console.error("Error formatting date:", error); // Mantener para errores de formato
             return 'Invalid Date';
         }
     };
@@ -90,6 +90,8 @@ const UserManagementPage = () => {
 
     // --- Funciones para Eliminar Usuario ---
     const handleDeleteUser = async (userId, userName) => {
+        // >>>>>>>>>>>>>>> NOTA: window.confirm no funciona en entornos de iFrame. <<<<<<<<<<<<<<<<
+        // Para una aplicación en producción, deberías reemplazar esto con un modal de confirmación personalizado.
         if (window.confirm(`¿Estás seguro de que deseas eliminar al usuario ${userName}? Esta acción no se puede deshacer.`)) {
             try {
                 await api.delete(

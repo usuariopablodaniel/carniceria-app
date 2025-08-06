@@ -5,16 +5,11 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const PrivateRoute = ({ children }) => {
-  const { isAuthenticated, token, loadingAuth } = useAuth(); // <-- Obtener loadingAuth
-
-  console.log('--- PrivateRoute check ---');
-  console.log('isAuthenticated en PrivateRoute:', isAuthenticated);
-  console.log('Token en PrivateRoute:', token ? 'Existe' : 'No existe');
-  console.log('loadingAuth en PrivateRoute:', loadingAuth); // <-- Nuevo log
+  // Eliminado 'token' de la desestructuración ya que no se usa directamente aquí.
+  const { isAuthenticated, loadingAuth } = useAuth(); 
 
   // Si aún estamos cargando el estado de autenticación, mostrar un spinner o null
   if (loadingAuth) {
-    console.log('PrivateRoute: Aún cargando el estado de autenticación. Esperando...');
     return (
       <div style={{ padding: '20px', textAlign: 'center' }}>
         Cargando autenticación...
@@ -24,12 +19,10 @@ const PrivateRoute = ({ children }) => {
 
   // Si no está autenticado después de la carga, redirige a la página de login
   if (!isAuthenticated) {
-    console.log('PrivateRoute: Usuario NO autenticado (carga finalizada). Redirigiendo a /login.');
     return <Navigate to="/login" replace />;
   }
 
   // Si está autenticado, renderiza los componentes hijos (la página protegida)
-  console.log('PrivateRoute: Usuario AUTENTICADO (carga finalizada). Permitiendo acceso.');
   return children;
 };
 

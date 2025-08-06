@@ -69,7 +69,7 @@ const DashboardPage = () => {
                 // Llamada a la nueva ruta del backend
                 const response = await axios.get(`/transactions/history/${user.id}`);
                 setTransactions(response.data);
-                console.log("Historial de transacciones cargado:", response.data); // Para depuración
+                // console.log("Historial de transacciones cargado:", response.data); // Eliminado
             } catch (err) {
                 console.error('Error al obtener el historial de transacciones:', err);
                 setTransactionsError('No se pudo cargar tu historial de transacciones.');

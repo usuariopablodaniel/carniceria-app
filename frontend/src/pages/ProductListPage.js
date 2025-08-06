@@ -36,7 +36,7 @@ const ProductListPage = () => {
         }
     }, []);
 
-    const fetchProducts = async () => {
+    const fetchProducts = useCallback(async () => { // Añadido useCallback para memoizar la función
         setLoading(true);
         setError(null);
         try {
@@ -59,11 +59,11 @@ const ProductListPage = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [renderSafeValue]); // Dependencia para useCallback, ya que renderSafeValue se usa dentro
 
     useEffect(() => {
         fetchProducts();
-    }, []);
+    }, [fetchProducts]); // <-- 'fetchProducts' añadido aquí para resolver la advertencia de dependencia
 
     const handleAddProductClick = () => {
         navigate('/products/add');
@@ -82,7 +82,6 @@ const ProductListPage = () => {
         try {
             // Se usa productToDelete.id para coincidir con la respuesta del backend
             await api.delete(`/products/${productToDelete.id}`); 
-            console.log(`Producto con ID ${productToDelete.id} eliminado.`);
             setShowDeleteModal(false);
             setProductToDelete(null);
             fetchProducts();
@@ -135,10 +134,11 @@ const ProductListPage = () => {
                                     <div className="card h-100 shadow-sm rounded-lg" style={{ border: '1px solid #e0e0e0' }}>
                                         <div className="card-img-top bg-light" style={{ height: '180px', width: '100%' }}></div>
                                         <div className="card-body p-3">
-                                            <h5 className="card-title placeholder col-8 mb-2"></h5>
-                                            <p className="card-text placeholder col-6"></p>
-                                            <p className="card-text placeholder col-4"></p>
-                                            <span className="badge bg-secondary placeholder col-3"></span>
+                                            {/* Añadido contenido para accesibilidad */}
+                                            <h5 className="card-title placeholder col-8 mb-2">Cargando Título</h5> 
+                                            <p className="card-text placeholder col-6">Cargando descripción</p>
+                                            <p className="card-text placeholder col-4">Cargando precio</p>
+                                            <span className="badge bg-secondary placeholder col-3">Cargando categoría</span>
                                         </div>
                                     </div>
                                 </div>
@@ -225,3 +225,4 @@ const ProductListPage = () => {
 };
 
 export default ProductListPage;
+

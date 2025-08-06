@@ -107,7 +107,7 @@ const ProductEditPage = () => {
         if (type === 'file') {
             const file = files[0];
             setImageFile(file); 
-            console.log('FRONTEND DEBUG: handleChange - Archivo seleccionado:', file); 
+            // console.log('FRONTEND DEBUG: handleChange - Archivo seleccionado:', file); // Eliminado
             if (file) {
                 if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
                     URL.revokeObjectURL(imagePreviewUrl);
@@ -149,9 +149,9 @@ const ProductEditPage = () => {
         }));
         setImageFile(null); 
         setImagePreviewUrl(''); 
-        console.log('FRONTEND DEBUG: handleRemoveCurrentImage - Imagen actual marcada para eliminación. formData.imagen_url (después):', ''); 
-        console.log('FRONTEND DEBUG: handleRemoveCurrentImage - imageFile (después):', null);
-        console.log('FRONTEND DEBUG: handleRemoveCurrentImage - imagePreviewUrl (después):', '');
+        // console.log('FRONTEND DEBUG: handleRemoveCurrentImage - Imagen actual marcada para eliminación. formData.imagen_url (después):', ''); // Eliminado
+        // console.log('FRONTEND DEBUG: handleRemoveCurrentImage - imageFile (después):', null); // Eliminado
+        // console.log('FRONTEND DEBUG: handleRemoveCurrentImage - imagePreviewUrl (después):', ''); // Eliminado
     };
 
     const handleSubmit = async (e) => {
@@ -160,9 +160,9 @@ const ProductEditPage = () => {
         setError(null); 
         setIsSubmitting(true);
 
-        console.log('FRONTEND DEBUG: handleSubmit - Iniciando envío del formulario.'); 
-        console.log('FRONTEND DEBUG: handleSubmit - Estado inicial de imageFile:', imageFile); 
-        console.log('FRONTEND DEBUG: handleSubmit - Estado inicial de formData.imagen_url:', formData.imagen_url); 
+        // console.log('FRONTEND DEBUG: handleSubmit - Iniciando envío del formulario.'); // Eliminado
+        // console.log('FRONTEND DEBUG: handleSubmit - Estado inicial de imageFile:', imageFile); // Eliminado
+        // console.log('FRONTEND DEBUG: handleSubmit - Estado inicial de formData.imagen_url:', formData.imagen_url); // Eliminado
 
         if (!formData.nombre || formData.stock === '') {
             setError('Nombre y Stock son obligatorios.');
@@ -230,20 +230,20 @@ const ProductEditPage = () => {
 
         if (imageFile) { 
             dataToSend.append('imagen', imageFile); 
-            console.log('FRONTEND DEBUG: handleSubmit - Añadiendo imageFile a FormData:', imageFile.name); 
+            // console.log('FRONTEND DEBUG: handleSubmit - Añadiendo imageFile a FormData:', imageFile.name); // Eliminado
         } else if (formData.imagen_url === '') { 
             dataToSend.append('imagen_url_clear', 'true'); 
-            console.log('FRONTEND DEBUG: handleSubmit - Solicitud para limpiar imagen actual (imagen_url_clear: true).'); 
+            // console.log('FRONTEND DEBUG: handleSubmit - Solicitud para limpiar imagen actual (imagen_url_clear: true).'); // Eliminado
         } else { 
-            console.log('FRONTEND DEBUG: handleSubmit - No se seleccionó nueva imagen ni se solicitó limpiar la actual. Se mantiene la imagen existente en DB.'); 
+            // console.log('FRONTEND DEBUG: handleSubmit - No se seleccionó nueva imagen ni se solicitó limpiar la actual. Se mantiene la imagen existente en DB.'); // Eliminado
         }
 
-        console.log('FRONTEND DEBUG: Final FormData content antes de la llamada API:');
-        for (let pair of dataToSend.entries()) {
-            console.log(pair[0]+ ', ' + pair[1]); 
-        }
-        console.log('FRONTEND DEBUG: Estado final de imageFile:', imageFile);
-        console.log('FRONTEND DEBUG: Estado final de formData.imagen_url:', formData.imagen_url);
+        // console.log('FRONTEND DEBUG: Final FormData content antes de la llamada API:'); // Eliminado
+        // for (let pair of dataToSend.entries()) { // Eliminado
+        //     console.log(pair[0]+ ', ' + pair[1]); // Eliminado
+        // } // Eliminado
+        // console.log('FRONTEND DEBUG: Estado final de imageFile:', imageFile); // Eliminado
+        // console.log('FRONTEND DEBUG: Estado final de formData.imagen_url:', formData.imagen_url); // Eliminado
 
         try {
             const response = await api.put(`/products/${id}`, dataToSend, {
@@ -330,6 +330,7 @@ const ProductEditPage = () => {
                         name="nombre"
                         value={formData.nombre}
                         onChange={handleChange}
+                        placeholder="Ej: Lomo de cerdo"
                         required
                     />
                 </Form.Group>
@@ -342,6 +343,7 @@ const ProductEditPage = () => {
                         name="descripcion"
                         value={formData.descripcion}
                         onChange={handleChange}
+                        placeholder="Breve descripción del producto..."
                     />
                 </Form.Group>
 

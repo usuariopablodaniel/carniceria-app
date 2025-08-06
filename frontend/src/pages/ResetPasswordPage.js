@@ -1,12 +1,12 @@
 // frontend/src/pages/ResetPasswordPage.js
 import React, { useState, useEffect } from 'react';
 import { Container, Form, Button, Card, Alert } from 'react-bootstrap';
-import { useParams, useNavigate } from 'react-router-dom';
+// Usaremos useLocation en lugar de useParams
+import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 
 const ResetPasswordPage = () => {
-    // Extraemos el token de la URL
-    const { token } = useParams(); 
+    const location = useLocation();
     const navigate = useNavigate();
 
     const [password, setPassword] = useState('');
@@ -14,14 +14,19 @@ const ResetPasswordPage = () => {
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [token, setToken] = useState(null); // Nuevo estado para el token
 
-    // Verificamos que el token exista en la URL al cargar el componente
+    // Leemos el token de los parámetros de consulta de la URL
     useEffect(() => {
-        if (!token) {
+        const queryParams = new URLSearchParams(location.search);
+        const tokenFromUrl = queryParams.get('token');
+        setToken(tokenFromUrl);
+
+        if (!tokenFromUrl) {
             setError('Token de restablecimiento no encontrado. Redirigiendo a la página de solicitud...');
             setTimeout(() => navigate('/password-reset-request'), 3000);
         }
-    }, [token, navigate]);
+    }, [location.search, navigate]);
 
     const handlePasswordReset = async (e) => {
         e.preventDefault();
@@ -34,17 +39,21 @@ const ResetPasswordPage = () => {
             setIsLoading(false);
             return;
         }
+        
+        // Verificamos que el token exista antes de continuar
+        if (!token) {
+            setError('Token inválido o expirado. Por favor, solicita un nuevo enlace.');
+            setIsLoading(false);
+            return;
+        }
 
         try {
-            // Llama al endpoint de tu backend para procesar el restablecimiento de contraseña
-            // Corrección: el token se envía en el cuerpo de la petición, no en la URL.
             const response = await api.post('/auth/reset-password', {
                 token: token,
-                newPassword: password // El backend espera 'newPassword', no 'password'
-            }); 
+                newPassword: password
+            });
             setMessage(response.data.message);
             setError('');
-            // Opcional: Redirigir al usuario al login después de un tiempo
             setTimeout(() => navigate('/login'), 3000);
         } catch (err) {
             console.error('Error al restablecer la contraseña:', err);
@@ -54,6 +63,20 @@ const ResetPasswordPage = () => {
             setIsLoading(false);
         }
     };
+    
+    // Si no hay token, mostramos el mensaje de error o cargando
+    if (!token) {
+        return (
+            <Container className="my-5 d-flex justify-content-center">
+                <Card className="shadow-lg p-4" style={{ maxWidth: '500px', width: '100%' }}>
+                    <Card.Body>
+                        <h2 className="text-center mb-4">Establecer Nueva Contraseña</h2>
+                        {error && <Alert variant="danger">{error}</Alert>}
+                    </Card.Body>
+                </Card>
+            </Container>
+        );
+    }
 
     return (
         <Container className="my-5 d-flex justify-content-center">

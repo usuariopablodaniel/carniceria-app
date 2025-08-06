@@ -72,8 +72,8 @@ function App() {
                             {/* Ruta para solicitar el restablecimiento de contraseña */}
                             <Route path="/password-reset-request" element={<PasswordResetRequestPage />} />
 
-                            {/* Ruta para establecer la nueva contraseña (incluye el token) */}
-                            <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+                            {/* ¡¡CAMBIO CLAVE AQUÍ!! La ruta NO debe tener ':token'. */}
+                            <Route path="/reset-password" element={<ResetPasswordPage />} />
 
                             <Route
                                 path="/dashboard"

@@ -82,7 +82,7 @@ const RedemptionProductsPage = () => {
         if (window.confirm('¿Estás seguro de que quieres eliminar este producto de canje?')) {
             try {
                 await api.delete(`/products/${productId}`); 
-                console.log(`Producto de canje con ID ${productId} eliminado.`);
+                // console.log(`Producto de canje con ID ${productId} eliminado.`); // Eliminado
                 fetchRedemptionProducts(); // Volver a cargar la lista después de eliminar
             } catch (err) {
                 console.error("Error al eliminar el producto de canje:", err);

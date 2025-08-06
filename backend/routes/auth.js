@@ -3,15 +3,13 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const crypto = require('crypto'); // Necesario para generar tokens aleatorios
-
+const crypto = require('crypto');
 const { protect, authorizeRoles } = require('../middleware/authMiddleware');
 const passport = require('passport');
-
 const pool = require('../db'); // Importar el pool centralizado
 
 // IMPORTANTE: Importar el nuevo servicio de email
-const { sendPasswordResetEmail } = require('../services/emailService');
+const { sendPasswordResetEmail } = require('./../services/emailService');
 
 // CLAVE SECRETA PARA FIRMAR LOS TOKENS JWT
 const JWT_SECRET_GLOBAL = process.env.JWT_SECRET || 'supersecretkey_fallback';
@@ -72,25 +70,18 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
-    console.log('Intento de login para email:', email);
     try {
         const clientQuery = 'SELECT id, nombre, email, puntos_actuales, password_hash, role FROM clientes WHERE email = $1';
         const result = await pool.query(clientQuery, [email]);
         const cliente = result.rows[0];
 
         if (!cliente) {
-            console.log('Cliente no encontrado para el email:', email);
             return res.status(400).json({ error: 'Credenciales inválidas.' });
         }
 
-        console.log('Cliente encontrado en BD:', cliente.email);
-
         const isMatch = await bcrypt.compare(password, cliente.password_hash);
 
-        console.log('Resultado de bcrypt.compare:', isMatch);
-
         if (!isMatch) {
-            console.log('Contraseña NO coincide para el email:', email);
             return res.status(400).json({ error: 'Credenciales inválidas.' });
         }
 
@@ -138,21 +129,17 @@ router.get('/google', passport.authenticate('google', { scope: ['profile', 'emai
 router.get('/google/callback',
     passport.authenticate('google', { failureRedirect: 'http://localhost:3000/login?message=google_login_failed' }),
     async (req, res) => {
-        console.log('--- BACKEND: Ruta /google/callback HA SIDO ALCANZADA ---');
         try {
             const cliente = req.user;
             if (!cliente) {
-                console.error('Error: Cliente no disponible en req.user después de autenticación Google.');
                 return res.redirect('http://localhost:3000/login?error=auth_failed');
             }
-            console.log('Cliente obtenido de Passport.js (Google):', cliente);
 
             const token = jwt.sign(
                 { id: cliente.id, email: cliente.email, role: cliente.role },
                 JWT_SECRET_GLOBAL,
                 { expiresIn: '1h' }
             );
-            console.log('Token JWT generado para Google login.');
             const clienteParaFrontend = {
                 id: cliente.id,
                 nombre: cliente.nombre,
@@ -161,7 +148,6 @@ router.get('/google/callback',
                 google_id: cliente.google_id,
                 role: cliente.role,
             };
-            console.log('Datos de cliente a enviar al frontend para Google login:', clienteParaFrontend);
             res.redirect(`http://localhost:3000/auth/google/callback?token=${token}&user=${encodeURIComponent(JSON.stringify(clienteParaFrontend))}`);
         } catch (err) {
             console.error('Error en Google callback al procesar cliente:', err);
@@ -171,7 +157,6 @@ router.get('/google/callback',
 );
 
 // --- Rutas de Recuperación de Contraseña ---
-
 // @route   POST /api/auth/forgot-password
 // @desc    Solicita un token de restablecimiento de contraseña y envía el email
 // @access  Public
@@ -182,24 +167,27 @@ router.post('/forgot-password', async (req, res) => {
         const userResult = await pool.query(userQuery, [email]);
         const user = userResult.rows[0];
 
-        // Se envía un mensaje genérico para evitar la enumeración de usuarios
         if (!user) {
             return res.status(200).json({ message: 'Si el email está registrado, recibirás un enlace para restablecer la contraseña.' });
         }
 
-        // Generar un token aleatorio y su fecha de expiración (1 hora)
         const resetToken = crypto.randomBytes(32).toString('hex');
-        const resetTokenExpiresAt = new Date(Date.now() + 3600000); // 1 hora en milisegundos
+        const resetTokenExpiresAt = new Date(Date.now() + 3600000); // 1 hora
 
-        // Guardar el token y la fecha de expiración en la base de datos
-        await pool.query(
+        const salt = await bcrypt.genSalt(10);
+        const hashedToken = await bcrypt.hash(resetToken, salt);
+
+        const updateResult = await pool.query(
             'UPDATE clientes SET reset_token = $1, reset_token_expires_at = $2 WHERE id = $3',
-            [resetToken, resetTokenExpiresAt, user.id]
+            [hashedToken, resetTokenExpiresAt, user.id]
         );
+        
+        if (updateResult.rowCount === 0) {
+            console.error('Error: No se pudo actualizar el usuario con el token de restablecimiento.');
+            return res.status(500).json({ error: 'Error interno del servidor al guardar el token.' });
+        }
 
-        const resetUrl = `http://localhost:3000/reset-password/${resetToken}`;
-
-        // LLAMADA AL SERVICIO DE EMAIL: Esto es lo que se ha modificado
+        const resetUrl = `http://localhost:3000/reset-password?token=${resetToken}`;
         await sendPasswordResetEmail(email, resetUrl);
 
         res.status(200).json({ message: 'Si el email está registrado, recibirás un enlace para restablecer la contraseña.' });
@@ -221,23 +209,29 @@ router.post('/reset-password', async (req, res) => {
     }
 
     try {
-        // Buscar usuario por token y verificar que no haya expirado
-        const userQuery = 'SELECT id FROM clientes WHERE reset_token = $1 AND reset_token_expires_at > NOW()';
-        const userResult = await pool.query(userQuery, [token]);
-        const user = userResult.rows[0];
+        const usersResult = await pool.query('SELECT id, reset_token FROM clientes WHERE reset_token IS NOT NULL AND reset_token_expires_at > NOW()');
+        const users = usersResult.rows;
 
-        if (!user) {
-            return res.status(400).json({ error: 'Token inválido o expirado.' });
+        let userToReset = null;
+
+        for (const user of users) {
+            const isMatch = await bcrypt.compare(token, user.reset_token);
+            if (isMatch) {
+                userToReset = user;
+                break;
+            }
         }
 
-        // Hashear la nueva contraseña
+        if (!userToReset) {
+            return res.status(400).json({ error: 'Token inválido o expirado.' });
+        }
+        
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(newPassword, salt);
-
-        // Actualizar la contraseña del usuario y limpiar el token
+        
         await pool.query(
             'UPDATE clientes SET password_hash = $1, reset_token = NULL, reset_token_expires_at = NULL WHERE id = $2',
-            [passwordHash, user.id]
+            [passwordHash, userToReset.id]
         );
 
         res.status(200).json({ message: 'Contraseña actualizada exitosamente.' });
@@ -247,6 +241,7 @@ router.post('/reset-password', async (req, res) => {
         res.status(500).json({ error: 'Error del servidor al intentar restablecer la contraseña.' });
     }
 });
+
 
 // --- Rutas de Gestión de Usuarios (SOLO ADMINISTRADORES) ---
 

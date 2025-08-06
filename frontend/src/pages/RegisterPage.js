@@ -116,6 +116,7 @@ const RegisterPage = () => {
                                 placeholder="Ingresa tu número de teléfono"
                                 value={telefono}
                                 onChange={(e) => setTelefono(e.target.value)}
+                                maxLength={15} // Limita la longitud del teléfono
                             />
                         </Form.Group>
 

@@ -31,7 +31,7 @@ const LoginPage = () => {
   }, [location, navigate]);
 
   const handleSubmit = async (e) => {
-    console.log('handleSubmit se está ejecutando.');
+    // console.log('handleSubmit se está ejecutando.'); // Eliminado
     e.preventDefault();
     setError('');
     setLoading(true);
@@ -47,7 +47,7 @@ const LoginPage = () => {
       
       const { token, cliente } = response.data;
 
-      console.log("Login exitoso. Token y datos del cliente recibidos:", response.data);
+      // console.log("Login exitoso. Token y datos del cliente recibidos:", response.data); // Eliminado
 
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(cliente)); 
@@ -65,7 +65,7 @@ const LoginPage = () => {
   };
 
   const handleGoogleLoginRedirect = () => {
-    console.log('DEBUG: Redirigiendo a Google con la URL:', 'http://localhost:5000/api/auth/google');
+    // console.log('DEBUG: Redirigiendo a Google con la URL:', 'http://localhost:5000/api/auth/google'); // Eliminado
     window.location.href = 'http://localhost:5000/api/auth/google'; 
   };
 

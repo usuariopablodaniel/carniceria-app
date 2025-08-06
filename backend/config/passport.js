@@ -54,11 +54,11 @@ async (request, accessToken, refreshToken, profile, done) => {
                 'INSERT INTO preferencias_notificaciones (cliente_id) VALUES ($1)',
                 [user.id]
             );
-            console.log('Nuevo usuario de Google registrado:', user.email);
+            // console.log('Nuevo usuario de Google registrado:', user.email); // Eliminado
         } else {
             user = user.rows[0];
             await pool.query('UPDATE clientes SET fecha_ultima_sesion = NOW() WHERE id = $1', [user.id]);
-            console.log('Usuario de Google existente ha iniciado sesión:', user.email);
+            // console.log('Usuario de Google existente ha iniciado sesión:', user.email); // Eliminado
         }
         
         done(null, user); // Pasamos el usuario a la siguiente etapa de Passport (el callback en auth.js)

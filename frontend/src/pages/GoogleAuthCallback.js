@@ -20,7 +20,7 @@ const GoogleAuthCallback = () => {
         localStorage.setItem('user', JSON.stringify(user));
         
         login(token, user);
-        console.log('Google Login exitoso. Token y usuario guardados.');
+        // console.log('Google Login exitoso. Token y usuario guardados.'); // Eliminado
         navigate('/dashboard');
       } catch (error) {
         console.error('Error al parsear datos de usuario de Google:', error);

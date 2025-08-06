@@ -1,6 +1,6 @@
 // frontend/src/pages/ContactPage.js
 import React from 'react';
-import { Container, Card, Button, Row, Col } from 'react-bootstrap';
+import { Container, Card, Row, Col } from 'react-bootstrap'; // Eliminado 'Button'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faWhatsapp, faInstagram } from '@fortawesome/free-brands-svg-icons';
 import { faEnvelope } from '@fortawesome/free-solid-svg-icons';
