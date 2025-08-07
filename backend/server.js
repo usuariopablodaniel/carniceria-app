@@ -1,7 +1,7 @@
 // backend/server.js
+// IMPORTANTE: Este archivo ha sido corregido para funcionar correctamente en el entorno de producción de Render.
+
 require('dotenv').config();
-// console.log('--- INICIO DE SERVER.JS ---'); // Eliminado
-// console.log('CLIENT_URL cargado en backend (server.js):', process.env.CLIENT_URL); // Eliminado
 
 const express = require('express');
 const cors = require('cors');
@@ -10,107 +10,94 @@ const session = require('express-session');
 const path = require('path');
 const fs = require('fs/promises'); 
 
-// console.log('Cargando configuración de Passport...'); // Eliminado
+// Cargar la configuración de Passport
 require('./config/passport'); 
 
 const app = express();
+// El puerto ahora es dinámico, asignado por Render en producción, o 5000 en local.
 const port = process.env.PORT || 5000;
 
-// Ruta de uploads (la que hemos acordado usar fuera de OneDrive)
-const UPLOADS_BASE_PATH = path.join('C:', 'temp', 'uploads');
+// === CORRECCIÓN CLAVE: UPLOADS_BASE_PATH ===
+// La ruta de uploads debe ser relativa al proyecto en Render, no a una ruta local de tu PC.
+// Se ha cambiado 'C:/temp/uploads' a 'uploads' para que Render lo cree dentro del proyecto.
+const UPLOADS_BASE_PATH = path.join(__dirname, '..', 'uploads');
 const IMAGES_UPLOAD_PATH = path.join(UPLOADS_BASE_PATH, 'imagenes');
-// console.log(`Ruta absoluta de imágenes de uploads: ${IMAGES_UPLOAD_PATH}`); // Eliminado
 
 // Asegúrate de que la carpeta de destino exista.
 fs.mkdir(IMAGES_UPLOAD_PATH, { recursive: true })
     .then(() => {
-        // console.log(`Carpeta de uploads asegurada: ${IMAGES_UPLOAD_PATH}`); // Eliminado
+        // La carpeta de uploads se ha creado o ya existe.
     })
     .catch(err => console.error(`Error al asegurar la carpeta de uploads: ${IMAGES_UPLOAD_PATH}`, err));
 
 
 const pool = require('./db'); 
 
-// *** Importaciones de Rutas ***
-// console.log('Importando rutas...'); // Eliminado
+// Importaciones de Rutas
 const authRoutes = require('./routes/auth');
 const productRoutes = require('./routes/productRoutes'); 
 const transactionRoutes = require('./routes/transactionRoutes'); 
 const notificationRoutes = require('./routes/notifications'); 
 
-// Middleware
-// console.log('Configurando middlewares generales...'); // Eliminado
+// === CORRECCIÓN CLAVE: CONFIGURACIÓN DE CORS ===
+// Para que el frontend en Vercel pueda comunicarse con el backend en Render,
+// el 'origin' debe permitir la URL de Vercel. Una forma sencilla para producción es '*'
+// para permitir todos los orígenes.
+const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
 app.use(cors({
-    origin: 'http://localhost:3000', 
+    origin: clientUrl,
     credentials: true 
 }));
 
-// console.log('Configurando sesiones para Passport...'); // Eliminado
+// === CORRECCIÓN CLAVE: CONFIGURACIÓN DE SESIONES ===
+// 'secure: true' es necesario para cookies en producción.
+// 'sameSite: "none"' también es necesario para que funcione con dominios cruzados (Vercel -> Render).
 app.use(session({
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false }
+    cookie: { 
+        secure: true, 
+        sameSite: 'none'
+    }
 }));
 
-// console.log('Inicializando Passport...'); // Eliminado
+
 app.use(passport.initialize());
 app.use(passport.session());
 
 // =======================================================
 // === USO DE RUTAS DE API ===
 // =======================================================
-// console.log('Configurando rutas de API...'); // Eliminado
-
-// >>>>>>>>>>>>>>> ESTO ES CRÍTICO Y CORRECTO PARA MULTER <<<<<<<<<<<<<<<<
-// Las rutas de Productos (que usan Multer) se definen PRIMERO.
-// Multer se aplica DENTRO de productRoutes.js, y al estar esta línea antes
-// de express.json/urlencoded, Multer tendrá la oportunidad de procesar
-// el 'multipart/form-data' antes de que el body sea consumido.
-app.use('/api/products', (req, res, next) => { /* console.log('MIDDLEWARE: /api/products'); */ next(); }, productRoutes); // Comentado o eliminado log
-
-// >>>>>>>>>>>>>>> ESTO ES CRÍTICO Y CORRECTO PARA JSON/URL-ENCODED <<<<<<<<<<<<<<<<
-// express.json() y express.urlencoded() se aplican DESPUÉS de las rutas de productos.
-// Esto significa que Multer ya procesó el body para /api/products.
-// Para las demás rutas (auth, transactions, notifications), estos middlewares
-// se ejecutarán y parsearán los bodies JSON o URL-encoded correctamente.
+app.use('/api/products', productRoutes); 
 app.use(express.json()); 
 app.use(express.urlencoded({ extended: true })); 
-// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-// Rutas que esperan JSON o URL-encoded bodies
-app.use('/api/auth', (req, res, next) => { /* console.log('MIDDLEWARE: /api/auth'); */ next(); }, authRoutes); // Comentado o eliminado log
-app.use('/api/transactions', (req, res, next) => { /* console.log('MIDDLEWARE: /api/transactions'); */ next(); }, transactionRoutes); // Comentado o eliminado log
-app.use('/api/notifications', (req, res, next) => { /* console.log('MIDDLEWARE: /api/notifications'); */ next(); }, notificationRoutes); // Comentado o eliminado log
-// =======================================================
+app.use('/api/auth', authRoutes); 
+app.use('/api/transactions', transactionRoutes); 
+app.use('/api/notifications', notificationRoutes); 
 
 // =======================================================
 // === CONFIGURACIÓN PARA SERVIR ARCHIVOS ESTATICOS ===
 // =======================================================
-// console.log('Configurando middleware para servir imágenes estáticas en /api/images...'); // Eliminado
 app.use('/api/images', express.static(IMAGES_UPLOAD_PATH, {
     setHeaders: function (res, path, stat) {
-        // console.log(`MIDDLEWARE: express.static sirviendo: ${path}`); // Eliminado
         res.set('Cache-Control', 'no-cache'); 
     },
     fallthrough: false 
 }));
 
 app.use('/api/images', (req, res) => {
-    console.error(`ERROR: Fallback de /api/images alcanzado. Esto indica un problema con express.static.`);
+    console.error(`ERROR: Fallback de /api/images alcanzado.`);
     res.status(500).json({ error: 'Error interno al servir la imagen.' });
 });
 // =======================================================
 
 // --- Rutas de Prueba para Verificar el Backend ---
-// console.log('Configurando rutas de prueba...'); // Eliminado
 app.get('/', (req, res) => {
-    // console.log('MIDDLEWARE: / (root) alcanzado.'); // Eliminado
     res.send('Backend de la Carnicería funcionando!');
 });
 
 app.get('/db-test', async (req, res) => {
-    // console.log('MIDDLEWARE: /db-test alcanzado.'); // Eliminado
     try {
         const client = await pool.connect();
         const result = await client.query('SELECT NOW()');
@@ -123,7 +110,6 @@ app.get('/db-test', async (req, res) => {
 });
 
 // Middleware de manejo de errores centralizado (al final)
-// console.log('Configurando middleware de manejo de errores...'); // Eliminado
 app.use((err, req, res, next) => {
     console.error('ERROR GLOBAL de Express:', err.stack);
     if (res.headersSent) {
@@ -136,17 +122,15 @@ app.use((err, req, res, next) => {
 });
 
 // Middleware para manejar rutas no encontradas (404) para el resto de la API
-// console.log('Configurando middleware para rutas 404...'); // Eliminado
 app.use((req, res) => {
     if (!res.headersSent) { 
-        // console.warn(`WARN: Ruta de API no encontrada: ${req.method} ${req.originalUrl}`); // Eliminado
         res.status(404).json({ error: 'Ruta de API no encontrada.' });
     }
 });
 
 // Iniciar el servidor
 app.listen(port, () => {
-    console.log(`Servidor backend corriendo en http://localhost:${port}`);
-    // console.log(`Imágenes estáticas disponibles en http://localhost:${port}/api/images/`); // Eliminado
-    // console.log('--- SERVER.JS INICIADO ---'); // Eliminado
+    // === CORRECCIÓN CLAVE: LOG DE INICIO ===
+    // El log ahora no menciona 'localhost' para evitar confusión en Render.
+    console.log(`Servidor backend corriendo en el puerto ${port}`);
 });
