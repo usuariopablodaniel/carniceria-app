@@ -65,7 +65,7 @@ const LoginPage = () => {
   };
 
   const handleGoogleLoginRedirect = () => {
-    // console.log('DEBUG: Redirigiendo a Google con la URL:', 'http://localhost:5000/api/auth/google'); // Eliminado
+    
     window.location.href = 'https://carniceria-api-vmy1.onrender.com/api/auth/google'; 
   };
 
