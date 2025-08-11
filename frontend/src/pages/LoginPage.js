@@ -65,8 +65,7 @@ const LoginPage = () => {
   };
 
   const handleGoogleLoginRedirect = () => {
-    
-    window.location.href = 'https://carniceria-api-vmy1.onrender.com/api/auth/google'; 
+        window.location.href = 'https://carniceria-api-vmy1.onrender.com/api/auth/google'; 
   };
 
   return (
