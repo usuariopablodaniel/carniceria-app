@@ -26,7 +26,7 @@ passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     // <<<<<<<<<<<< CAMBIO CLAVE AQUÍ: DEBE APUNTAR AL BACKEND (PUERTO 5000) >>>>>>>>>>>>
-    callbackURL: `http://localhost:5000/api/auth/google/callback`, 
+    callbackURL: `https://carniceria-api-vmy1.onrender.com/api/auth/google/callback`, 
     // ^^^ Este es el URI que Google utilizará para redirigir después de una autenticación exitosa.
     // Debe coincidir exactamente con una de las "URI de redireccionamiento autorizados" en tu Google Cloud Console.
     passReqToCallback: true 
