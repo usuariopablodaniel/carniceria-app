@@ -14,6 +14,11 @@ const { sendPasswordResetEmail } = require('./../services/emailService');
 // CLAVE SECRETA PARA FIRMAR LOS TOKENS JWT
 const JWT_SECRET_GLOBAL = process.env.JWT_SECRET || 'supersecretkey_fallback';
 
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
+const GOOGLE_LOGIN_FAILED_URL = `${CLIENT_URL}/login?message=google_login_failed`;
+const GOOGLE_LOGIN_SUCCESS_URL = `${CLIENT_URL}/auth/google/callback`;
+const RESET_PASSWORD_URL = `${CLIENT_URL}/reset-password`;
+
 // --- Ruta de Registro de Usuario ---
 router.post('/register', async (req, res) => {
     const { nombre, email, password, telefono } = req.body;
@@ -127,12 +132,12 @@ router.get('/me', protect, async (req, res) => {
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
 router.get('/google/callback',
-    passport.authenticate('google', { failureRedirect: 'https://carniceria-app.vercel.app/login?message=google_login_failed' }),
+    passport.authenticate('google', { failureRedirect: GOOGLE_LOGIN_FAILED_URL }),
     async (req, res) => {
         try {
             const cliente = req.user;
             if (!cliente) {
-                return res.redirect('https://carniceria-app.vercel.app/login?error=auth_failed');
+                return res.redirect(GOOGLE_LOGIN_FAILED_URL);
             }
 
             const token = jwt.sign(
@@ -148,10 +153,10 @@ router.get('/google/callback',
                 google_id: cliente.google_id,
                 role: cliente.role,
             };
-            res.redirect(`https://carniceria-app.vercel.app/auth/google/callback?token=${token}&user=${encodeURIComponent(JSON.stringify(clienteParaFrontend))}`);
+            res.redirect(`${GOOGLE_LOGIN_SUCCESS_URL}?token=${token}&user=${encodeURIComponent(JSON.stringify(clienteParaFrontend))}`);
         } catch (err) {
             console.error('Error en Google callback al procesar cliente:', err);
-            res.redirect('https://carniceria-app.vercel.app/login?error=server_error');
+            res.redirect(GOOGLE_LOGIN_FAILED_URL);
         }
     }
 );
@@ -187,7 +192,7 @@ router.post('/forgot-password', async (req, res) => {
             return res.status(500).json({ error: 'Error interno del servidor al guardar el token.' });
         }
 
-        const resetUrl = `https://carniceria-app.vercel.app/reset-password?token=${resetToken}`;
+        const resetUrl = `${RESET_PASSWORD_URL}?token=${resetToken}`;
         await sendPasswordResetEmail(email, resetUrl);
 
         res.status(200).json({ message: 'Si el email está registrado, recibirás un enlace para restablecer la contraseña.' });
