@@ -6,7 +6,8 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 
 const ProductListPage = () => {
-    const [products, setProducts] = useState([]);
+    const [saleProducts, setSaleProducts] = useState([]);
+    const [pointsProducts, setPointsProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -28,9 +29,14 @@ const ProductListPage = () => {
         setError(null);
         try {
             const response = await api.get('/products');
-            // Ahora mostramos todos los productos, sin filtrar por ofertas o canjes
             const allProducts = Array.isArray(response.data) ? response.data : [];
-            setProducts(allProducts);
+
+            // Filtramos los productos en dos listas separadas
+            const saleItems = allProducts.filter(product => product.precio && !product.puntos_canje);
+            const pointsItems = allProducts.filter(product => product.puntos_canje && !product.precio);
+
+            setSaleProducts(saleItems);
+            setPointsProducts(pointsItems);
         } catch (err) {
             console.error("Error al obtener los productos:", err);
             if (err.response) {
@@ -43,7 +49,7 @@ const ProductListPage = () => {
         } finally {
             setLoading(false);
         }
-    }, []); // <-- Se ha eliminado renderSafeValue de aquí
+    }, []);
 
     useEffect(() => {
         fetchProducts();
@@ -81,6 +87,57 @@ const ProductListPage = () => {
         setProductToDelete(null);
     };
 
+    const renderProductCards = (productsToRender) => (
+        <Row xs={1} md={2} lg={3} className="g-4">
+            {productsToRender.map(product => (
+                <Col key={product.id}> 
+                    <Card className="h-100 shadow-sm rounded-lg">
+                        <Image
+                            variant="top"
+                            src={product.imagen_url}
+                            alt={renderSafeValue(product.nombre, 'Producto sin nombre')}
+                            style={{ height: '200px', width: '100%', objectFit: 'cover' }}
+                            loading="lazy"
+                            onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/400x200/cccccc/000000?text=Error+Carga+Imagen'; }}
+                        />
+                        <Card.Body className="d-flex flex-column">
+                            <Card.Title className="text-truncate" title={renderSafeValue(product.nombre, 'Producto sin nombre')}>
+                                {renderSafeValue(product.nombre, 'Producto sin nombre')}
+                            </Card.Title>
+                            <Card.Text className="text-muted small mb-2">
+                                {renderSafeValue(product.descripcion) || 'Sin descripción.'}
+                            </Card.Text>
+                            <div className="mt-auto">
+                                {/* Lógica para mostrar Precio o Puntos de Canje */}
+                                {product.precio ? (
+                                    <h5 className="text-primary mb-2">
+                                        ${parseFloat(product.precio).toFixed(2)}
+                                    </h5>
+                                ) : product.puntos_canje ? (
+                                    <h5 className="text-success mb-2">
+                                        {product.puntos_canje} Puntos
+                                    </h5>
+                                ) : (
+                                    <h5 className="text-muted mb-2">N/A</h5>
+                                )}
+                                {user && user.role === 'admin' && (
+                                    <div className="d-flex justify-content-between mt-3">
+                                        <Button variant="warning" size="sm" onClick={() => handleEditProductClick(product.id)} className="me-2 flex-grow-1">
+                                            Editar
+                                        </Button>
+                                        <Button variant="danger" size="sm" onClick={() => handleDeleteProduct(product)} className="flex-grow-1">
+                                            Eliminar
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        </Card.Body>
+                    </Card>
+                </Col>
+            ))}
+        </Row>
+    );
+
     if (error) {
         return (
             <Container className="my-5 d-flex justify-content-center">
@@ -109,82 +166,34 @@ const ProductListPage = () => {
                         <span className="visually-hidden">Cargando productos...</span>
                     </Spinner>
                     <p className="text-muted">Cargando productos, por favor espera...</p>
-                    <Row className="mt-4 w-100 justify-content-center">
-                        {Array.from({ length: 4 }).map((_, index) => (
-                            <Col key={index} xs={12} sm={6} md={4} lg={3} className="mb-4"> 
-                                <div className="placeholder-glow">
-                                    <div className="card h-100 shadow-sm rounded-lg" style={{ border: '1px solid #e0e0e0' }}>
-                                        <div className="card-img-top bg-light" style={{ height: '180px', width: '100%' }}></div>
-                                        <div className="card-body p-3">
-                                            <h5 className="card-title placeholder col-8 mb-2">Cargando Título</h5> 
-                                            <p className="card-text placeholder col-6">Cargando descripción</p>
-                                            <p className="card-text placeholder col-4">Cargando precio</p>
-                                            <span className="badge bg-secondary placeholder col-3">Cargando categoría</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </Col>
-                        ))}
-                    </Row>
                 </div>
-            ) : products.length === 0 ? (
-                <Alert variant="info" className="text-center my-5 d-flex flex-column align-items-center justify-content-center" style={{ minHeight: '300px' }}>
-                    <p className="mb-3 fs-5">¡Ups! Parece que no hay productos disponibles en este momento.</p>
-                    {user && user.role === 'admin' && (
-                        <Button variant="primary" onClick={handleAddProductClick}>
-                            Sé el primero en añadir un producto
-                        </Button>
-                    )}
-                </Alert>
             ) : (
-                <Row xs={1} md={2} lg={3} className="g-4">
-                    {products.map(product => (
-                        <Col key={product.id}> 
-                            <Card className="h-100 shadow-sm rounded-lg">
-                                <Image
-                                    variant="top"
-                                    src={product.imagen_url}
-                                    alt={renderSafeValue(product.nombre, 'Producto sin nombre')}
-                                    style={{ height: '200px', width: '100%', objectFit: 'cover' }}
-                                    loading="lazy"
-                                    onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/400x200/cccccc/000000?text=Error+Carga+Imagen'; }}
-                                />
-                                <Card.Body className="d-flex flex-column">
-                                    <Card.Title className="text-truncate" title={renderSafeValue(product.nombre, 'Producto sin nombre')}>
-                                        {renderSafeValue(product.nombre, 'Producto sin nombre')}
-                                    </Card.Title>
-                                    <Card.Text className="text-muted small mb-2">
-                                        {renderSafeValue(product.descripcion) || 'Sin descripción.'}
-                                    </Card.Text>
-                                    <div className="mt-auto">
-                                        {/* Lógica para mostrar Precio o Puntos de Canje */}
-                                        {product.precio ? (
-                                            <h5 className="text-primary mb-2">
-                                                ${parseFloat(product.precio).toFixed(2)}
-                                            </h5>
-                                        ) : product.puntos_canje ? (
-                                            <h5 className="text-success mb-2">
-                                                {product.puntos_canje} Puntos
-                                            </h5>
-                                        ) : (
-                                            <h5 className="text-muted mb-2">N/A</h5>
-                                        )}
-                                        {user && user.role === 'admin' && (
-                                            <div className="d-flex justify-content-between mt-3">
-                                                <Button variant="warning" size="sm" onClick={() => handleEditProductClick(product.id)} className="me-2 flex-grow-1">
-                                                    Editar
-                                                </Button>
-                                                <Button variant="danger" size="sm" onClick={() => handleDeleteProduct(product)} className="flex-grow-1">
-                                                    Eliminar
-                                                </Button>
-                                            </div>
-                                        )}
-                                    </div>
-                                </Card.Body>
-                            </Card>
-                        </Col>
-                    ))}
-                </Row>
+                <>
+                    {saleProducts.length > 0 && (
+                        <>
+                            <h2 className="text-dark mb-3">Ofertas</h2>
+                            {renderProductCards(saleProducts)}
+                        </>
+                    )}
+
+                    {pointsProducts.length > 0 && (
+                        <>
+                            <h2 className="text-dark mt-5 mb-3">Canje por Puntos</h2>
+                            {renderProductCards(pointsProducts)}
+                        </>
+                    )}
+
+                    {saleProducts.length === 0 && pointsProducts.length === 0 && (
+                        <Alert variant="info" className="text-center my-5 d-flex flex-column align-items-center justify-content-center" style={{ minHeight: '300px' }}>
+                            <p className="mb-3 fs-5">¡Ups! Parece que no hay productos disponibles en este momento.</p>
+                            {user && user.role === 'admin' && (
+                                <Button variant="primary" onClick={handleAddProductClick}>
+                                    Sé el primero en añadir un producto
+                                </Button>
+                            )}
+                        </Alert>
+                    )}
+                </>
             )}
 
             <Modal show={showDeleteModal} onHide={cancelDeleteProduct} centered>
