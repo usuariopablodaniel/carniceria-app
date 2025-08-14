@@ -9,6 +9,9 @@ const passport = require('passport');
 const session = require('express-session');
 const path = require('path');
 
+// === NUEVA LÍNEA: Inicializa la configuración de Cloudinary ===
+const cloudinary = require('./config/cloudinary');
+
 // Cargar la configuración de Passport
 require('./config/passport'); 
 
