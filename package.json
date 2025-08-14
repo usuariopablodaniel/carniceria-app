@@ -2,6 +2,7 @@
   "dependencies": {
     "bootstrap": "^5.3.6",
     "nodemailer": "^7.0.5",
-    "react-bootstrap": "^2.10.10"
+    "react-bootstrap": "^2.10.10",
+    "streamifier": "^0.1.1"
   }
 }
