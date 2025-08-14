@@ -15,8 +15,6 @@ const ProductListPage = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
 
-    // Función de utilidad para renderizar valores de forma segura.
-    // Evita el error "Objects are not valid as a React child".
     const renderSafeValue = useCallback((value, fallback = '') => {
         if (typeof value === 'object' && value !== null) {
             return fallback;
@@ -108,7 +106,6 @@ const ProductListPage = () => {
                                 {renderSafeValue(product.descripcion) || 'Sin descripción.'}
                             </Card.Text>
                             <div className="mt-auto">
-                                {/* Lógica para mostrar Precio o Puntos de Canje */}
                                 {product.precio ? (
                                     <h5 className="text-primary mb-2">
                                         ${parseFloat(product.precio).toFixed(2)}
