@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'; 
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Container, Form, Button, Alert, Spinner, Image } from 'react-bootstrap'; 
+import { Container, Form, Button, Alert, Spinner, Image, Row, Col } from 'react-bootstrap'; 
 import api from '../api/axios'; 
 
 const ProductEditPage = () => {
@@ -27,8 +27,9 @@ const ProductEditPage = () => {
     const [message, setMessage] = useState(null); 
     const [error, setError] = useState(null); 
     const [isSubmitting, setIsSubmitting] = useState(false);
-
-    const categories = ["Ternera", "Pollo", "Cerdo", "Pescado"];
+    
+    // Categorías mejoradas para que coincidan con ProductAddPage
+    const categories = ["Ternera", "Pollo", "Cerdo", "Pescado", "Embutidos", "Otros"];
 
     const fetchProduct = useCallback(async () => {
         try {
@@ -41,6 +42,7 @@ const ProductEditPage = () => {
             const response = await api.get(`/products/${id}`);
             const productData = response.data;
             
+            // Llenar el estado del formulario con los datos existentes
             setFormData({
                 nombre: productData.nombre || '',
                 descripcion: productData.descripcion || '',
@@ -53,12 +55,9 @@ const ProductEditPage = () => {
                 puntos_canje: productData.puntos_canje !== undefined && productData.puntos_canje !== null ? String(productData.puntos_canje) : '',
             });
 
+            // Usar la URL de la imagen directamente del servidor (Cloudinary)
             if (productData.imagen_url) {
-                const baseUrlWithoutApi = api.defaults.baseURL.replace('/api', ''); 
-                const fullImageUrl = productData.imagen_url.startsWith('/api/images/')
-                    ? `${baseUrlWithoutApi}${productData.imagen_url}` 
-                    : `${api.defaults.baseURL}/images/${productData.imagen_url}`; 
-                setImagePreviewUrl(fullImageUrl);
+                setImagePreviewUrl(productData.imagen_url);
             } else {
                 setImagePreviewUrl('');
             }
@@ -81,12 +80,10 @@ const ProductEditPage = () => {
         if (loadingAuth) {
             return; 
         }
-
         if (!isAuthenticated) {
             navigate('/login', { replace: true });
             return;
         }
-
         if (user && user.role !== 'admin') {
             navigate('/dashboard', { replace: true });
             return; 
@@ -99,31 +96,22 @@ const ProductEditPage = () => {
                 URL.revokeObjectURL(imagePreviewUrl);
             }
         };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id, user, navigate, isAuthenticated, loadingAuth, fetchProduct]); 
 
     const handleChange = (e) => {
         const { name, value, type, checked, files } = e.target;
+
         if (type === 'file') {
             const file = files[0];
-            setImageFile(file); 
-            // console.log('FRONTEND DEBUG: handleChange - Archivo seleccionado:', file); // Eliminado
+            setImageFile(file);
+            
+            if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(imagePreviewUrl);
+            }
             if (file) {
-                if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
-                    URL.revokeObjectURL(imagePreviewUrl);
-                }
-                setImagePreviewUrl(URL.createObjectURL(file));
+                setImagePreviewUrl(URL.createObjectURL(file)); 
             } else { 
-                if (formData.imagen_url) { 
-                    const baseUrlWithoutApi = api.defaults.baseURL.replace('/api', '');
-                    const fullImageUrl = formData.imagen_url.startsWith('/api/images/')
-                        ? `${baseUrlWithoutApi}${formData.imagen_url}`
-                        : `${api.defaults.baseURL}/images/${formData.imagen_url}`;
-                    setImagePreviewUrl(fullImageUrl); 
-                } else {
-                    setImagePreviewUrl(''); 
-                }
-                setImageFile(null); 
+                setImagePreviewUrl(formData.imagen_url || ''); 
             }
         } else {
             setFormData(prevData => {
@@ -131,7 +119,6 @@ const ProductEditPage = () => {
                     ...prevData,
                     [name]: type === 'checkbox' ? checked : value,
                 };
-
                 if (name === 'precio' && value !== '' && newData.puntos_canje !== '') {
                     newData.puntos_canje = '';
                 } else if (name === 'puntos_canje' && value !== '' && newData.precio !== '') {
@@ -148,10 +135,10 @@ const ProductEditPage = () => {
             imagen_url: '' 
         }));
         setImageFile(null); 
+        if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(imagePreviewUrl);
+        }
         setImagePreviewUrl(''); 
-        // console.log('FRONTEND DEBUG: handleRemoveCurrentImage - Imagen actual marcada para eliminación. formData.imagen_url (después):', ''); // Eliminado
-        // console.log('FRONTEND DEBUG: handleRemoveCurrentImage - imageFile (después):', null); // Eliminado
-        // console.log('FRONTEND DEBUG: handleRemoveCurrentImage - imagePreviewUrl (después):', ''); // Eliminado
     };
 
     const handleSubmit = async (e) => {
@@ -160,16 +147,11 @@ const ProductEditPage = () => {
         setError(null); 
         setIsSubmitting(true);
 
-        // console.log('FRONTEND DEBUG: handleSubmit - Iniciando envío del formulario.'); // Eliminado
-        // console.log('FRONTEND DEBUG: handleSubmit - Estado inicial de imageFile:', imageFile); // Eliminado
-        // console.log('FRONTEND DEBUG: handleSubmit - Estado inicial de formData.imagen_url:', formData.imagen_url); // Eliminado
-
         if (!formData.nombre || formData.stock === '') {
             setError('Nombre y Stock son obligatorios.');
             setIsSubmitting(false);
             return;
         }
-
         const hasPriceInput = formData.precio !== '' && formData.precio !== null;
         const hasPointsInput = formData.puntos_canje !== '' && formData.puntos_canje !== null;
 
@@ -183,7 +165,6 @@ const ProductEditPage = () => {
             setIsSubmitting(false);
             return;
         }
-
         if (hasPriceInput) {
             const parsedPrice = parseFloat(formData.precio);
             if (isNaN(parsedPrice) || parsedPrice <= 0) {
@@ -192,7 +173,6 @@ const ProductEditPage = () => {
                 return;
             }
         }
-
         if (hasPointsInput) {
             const parsedPoints = parseInt(formData.puntos_canje);
             if (isNaN(parsedPoints) || parsedPoints < 0) { 
@@ -201,14 +181,12 @@ const ProductEditPage = () => {
                 return;
             }
         }
-
         const parsedStock = parseInt(formData.stock);
         if (isNaN(parsedStock) || parsedStock < 0) {
             setError('El stock debe ser un número no negativo.');
             setIsSubmitting(false);
             return;
         }
-
         if (!formData.categoria || formData.categoria === '') {
             setError('Debe seleccionar una categoría para el producto.');
             setIsSubmitting(false);
@@ -216,34 +194,21 @@ const ProductEditPage = () => {
         }
 
         const dataToSend = new FormData();
-        for (const key in formData) {
-            if (['precio', 'puntos_canje', 'stock', 'disponible', 'imagen_url'].includes(key)) {
-                continue; 
-            }
-            dataToSend.append(key, formData[key]);
-        }
-
-        dataToSend.append('precio', hasPriceInput ? parseFloat(formData.precio) : ''); 
+        dataToSend.append('nombre', formData.nombre);
+        dataToSend.append('descripcion', formData.descripcion);
+        dataToSend.append('precio', hasPriceInput ? parseFloat(formData.precio) : '');
         dataToSend.append('puntos_canje', hasPointsInput ? parseInt(formData.puntos_canje) : '');
         dataToSend.append('stock', parsedStock);
-        dataToSend.append('disponible', formData.disponible ? 'true' : 'false');
-
+        dataToSend.append('unidad_de_medida', formData.unidad_de_medida);
+        dataToSend.append('categoria', formData.categoria);
+        dataToSend.append('disponible', formData.disponible);
+        
+        // Lógica de manejo de imagen
         if (imageFile) { 
             dataToSend.append('imagen', imageFile); 
-            // console.log('FRONTEND DEBUG: handleSubmit - Añadiendo imageFile a FormData:', imageFile.name); // Eliminado
         } else if (formData.imagen_url === '') { 
             dataToSend.append('imagen_url_clear', 'true'); 
-            // console.log('FRONTEND DEBUG: handleSubmit - Solicitud para limpiar imagen actual (imagen_url_clear: true).'); // Eliminado
-        } else { 
-            // console.log('FRONTEND DEBUG: handleSubmit - No se seleccionó nueva imagen ni se solicitó limpiar la actual. Se mantiene la imagen existente en DB.'); // Eliminado
         }
-
-        // console.log('FRONTEND DEBUG: Final FormData content antes de la llamada API:'); // Eliminado
-        // for (let pair of dataToSend.entries()) { // Eliminado
-        //     console.log(pair[0]+ ', ' + pair[1]); // Eliminado
-        // } // Eliminado
-        // console.log('FRONTEND DEBUG: Estado final de imageFile:', imageFile); // Eliminado
-        // console.log('FRONTEND DEBUG: Estado final de formData.imagen_url:', formData.imagen_url); // Eliminado
 
         try {
             const response = await api.put(`/products/${id}`, dataToSend, {
@@ -255,20 +220,15 @@ const ProductEditPage = () => {
             if (response.status === 200) {
                 setMessage('Producto actualizado exitosamente!');
                 setImageFile(null); 
-                // >>>>>>>>>>>>>>> CORRECCIÓN CLAVE AQUÍ: Manejar imagen_url que puede ser null <<<<<<<<<<<<<<<<
-                // Asegurarse de que response.data.product.imagen_url no sea null antes de llamar a startsWith
-                if (response.data.product && response.data.product.imagen_url) { // <-- Cambio clave: Eliminar !== undefined y añadir && response.data.product.imagen_url
-                    const baseUrlWithoutApi = api.defaults.baseURL.replace('/api', '');
-                    const newFullImageUrl = response.data.product.imagen_url.startsWith('/api/images/')
-                        ? `${baseUrlWithoutApi}${response.data.product.imagen_url}`
-                        : `${api.defaults.baseURL}/images/${response.data.product.imagen_url}`;
+                
+                // Actualizar el estado del formulario y la previsualización con la nueva imagen de la respuesta
+                if (response.data.product && response.data.product.imagen_url) {
                     setFormData(prevData => ({ ...prevData, imagen_url: response.data.product.imagen_url }));
-                    setImagePreviewUrl(newFullImageUrl || '');
-                } else { // Si la imagen_url es null o undefined, o si no hay product en la respuesta
+                    setImagePreviewUrl(response.data.product.imagen_url);
+                } else {
                     setFormData(prevData => ({ ...prevData, imagen_url: '' }));
                     setImagePreviewUrl('');
                 }
-                // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
                 setTimeout(() => {
                     navigate('/products');
@@ -347,32 +307,37 @@ const ProductEditPage = () => {
                     />
                 </Form.Group>
 
-                <Form.Group className="mb-3" controlId="precio">
-                    <Form.Label>Precio (deja vacío si es por canje)</Form.Label>
-                    <Form.Control
-                        type="number"
-                        name="precio"
-                        value={formData.precio}
-                        onChange={handleChange}
-                        step="0.01"
-                        placeholder="Ej: 15.75"
-                    />
-                </Form.Group>
-                
-                <Form.Group className="mb-3" controlId="puntos_canje">
-                    <Form.Label>Puntos de Canje (deja vacío si es por venta)</Form.Label>
-                    <Form.Control
-                        type="number"
-                        name="puntos_canje"
-                        value={formData.puntos_canje}
-                        onChange={handleChange}
-                        min="0"
-                        placeholder="Ej: 500"
-                    />
-                    <Form.Text className="text-muted">
-                        Si este producto se canjea por puntos, ingresa el valor aquí y deja el precio vacío.
-                    </Form.Text>
-                </Form.Group>
+                <Row className="mb-3">
+                    <Col>
+                        <Form.Group controlId="precio">
+                            <Form.Label>Precio (deja vacío si es por canje)</Form.Label>
+                            <Form.Control
+                                type="number"
+                                name="precio"
+                                value={formData.precio}
+                                onChange={handleChange}
+                                step="0.01"
+                                placeholder="Ej: 15.75"
+                            />
+                        </Form.Group>
+                    </Col>
+                    <Col>
+                        <Form.Group controlId="puntos_canje">
+                            <Form.Label>Puntos de Canje (deja vacío si es por venta)</Form.Label>
+                            <Form.Control
+                                type="number"
+                                name="puntos_canje"
+                                value={formData.puntos_canje}
+                                onChange={handleChange}
+                                min="0"
+                                placeholder="Ej: 500"
+                            />
+                        </Form.Group>
+                    </Col>
+                </Row>
+                <Form.Text className="text-muted d-block mb-3">
+                    Si este producto se canjea por puntos, ingresa el valor aquí y deja el precio vacío.
+                </Form.Text>
 
                 <Form.Group className="mb-3" controlId="stock">
                     <Form.Label>Stock</Form.Label>
@@ -434,7 +399,7 @@ const ProductEditPage = () => {
                             )}
                         </div>
                     )}
-                    {!imagePreviewUrl && formData.imagen_url === '' && imageFile === null && (
+                    {!imagePreviewUrl && (
                         <Form.Text className="text-muted d-block mt-1">
                             No hay imagen seleccionada ni imagen actual.
                         </Form.Text>
