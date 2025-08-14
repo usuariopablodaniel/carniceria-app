@@ -29,9 +29,9 @@ const ProductListPage = () => {
             const response = await api.get('/products');
             const allProducts = Array.isArray(response.data) ? response.data : [];
 
-            // Filtramos los productos en dos listas separadas
-            const saleItems = allProducts.filter(product => product.precio);
-            const pointsItems = allProducts.filter(product => product.puntos_canje);
+            // Filtramos los productos de manera más precisa
+            const saleItems = allProducts.filter(product => product.precio > 0);
+            const pointsItems = allProducts.filter(product => product.puntos_canje > 0);
 
             setSaleProducts(saleItems);
             setPointsProducts(pointsItems);
