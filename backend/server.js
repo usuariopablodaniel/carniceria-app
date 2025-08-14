@@ -8,7 +8,6 @@ const cors = require('cors');
 const passport = require('passport');
 const session = require('express-session');
 const path = require('path');
-const fs = require('fs/promises'); 
 
 // Cargar la configuración de Passport
 require('./config/passport'); 
@@ -16,20 +15,6 @@ require('./config/passport');
 const app = express();
 // El puerto ahora es dinámico, asignado por Render en producción, o 5000 en local.
 const port = process.env.PORT || 5000;
-
-// === CORRECCIÓN CLAVE: UPLOADS_BASE_PATH ===
-// La ruta de uploads debe ser relativa al proyecto en Render, no a una ruta local de tu PC.
-// Se ha cambiado 'C:/temp/uploads' a 'uploads' para que Render lo cree dentro del proyecto.
-const UPLOADS_BASE_PATH = path.join(__dirname, '..', 'uploads');
-const IMAGES_UPLOAD_PATH = path.join(UPLOADS_BASE_PATH, 'imagenes');
-
-// Asegúrate de que la carpeta de destino exista.
-fs.mkdir(IMAGES_UPLOAD_PATH, { recursive: true })
-    .then(() => {
-        // La carpeta de uploads se ha creado o ya existe.
-    })
-    .catch(err => console.error(`Error al asegurar la carpeta de uploads: ${IMAGES_UPLOAD_PATH}`, err));
-
 
 const pool = require('./db'); 
 
@@ -41,8 +26,7 @@ const notificationRoutes = require('./routes/notifications');
 
 // === CORRECCIÓN CLAVE: CONFIGURACIÓN DE CORS ===
 // Para que el frontend en Vercel pueda comunicarse con el backend en Render,
-// el 'origin' debe permitir la URL de Vercel. Una forma sencilla para producción es '*'
-// para permitir todos los orígenes.
+// el 'origin' debe permitir la URL de Vercel.
 const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
 app.use(cors({
     origin: clientUrl,
@@ -69,27 +53,14 @@ app.use(passport.session());
 // =======================================================
 // === USO DE RUTAS DE API ===
 // =======================================================
-app.use('/api/products', productRoutes); 
+// Nota: 'express.json()' y 'express.urlencoded' deben ir ANTES de las rutas que las usan.
 app.use(express.json()); 
-app.use(express.urlencoded({ extended: true })); 
+app.use(express.urlencoded({ extended: true }));
+app.use('/api/products', productRoutes); 
 app.use('/api/auth', authRoutes); 
 app.use('/api/transactions', transactionRoutes); 
 app.use('/api/notifications', notificationRoutes); 
 
-// =======================================================
-// === CONFIGURACIÓN PARA SERVIR ARCHIVOS ESTATICOS ===
-// =======================================================
-app.use('/api/images', express.static(IMAGES_UPLOAD_PATH, {
-    setHeaders: function (res, path, stat) {
-        res.set('Cache-Control', 'no-cache'); 
-    },
-    fallthrough: false 
-}));
-
-app.use('/api/images', (req, res) => {
-    console.error(`ERROR: Fallback de /api/images alcanzado.`);
-    res.status(500).json({ error: 'Error interno al servir la imagen.' });
-});
 // =======================================================
 
 // --- Rutas de Prueba para Verificar el Backend ---
@@ -130,7 +101,5 @@ app.use((req, res) => {
 
 // Iniciar el servidor
 app.listen(port, () => {
-    // === CORRECCIÓN CLAVE: LOG DE INICIO ===
-    // El log ahora no menciona 'localhost' para evitar confusión en Render.
     console.log(`Servidor backend corriendo en el puerto ${port}`);
 });
