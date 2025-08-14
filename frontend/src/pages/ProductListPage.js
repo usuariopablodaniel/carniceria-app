@@ -30,8 +30,8 @@ const ProductListPage = () => {
             const allProducts = Array.isArray(response.data) ? response.data : [];
 
             // Filtramos los productos en dos listas separadas
-            const saleItems = allProducts.filter(product => product.precio && !product.puntos_canje);
-            const pointsItems = allProducts.filter(product => product.puntos_canje && !product.precio);
+            const saleItems = allProducts.filter(product => product.precio);
+            const pointsItems = allProducts.filter(product => product.puntos_canje);
 
             setSaleProducts(saleItems);
             setPointsProducts(pointsItems);
