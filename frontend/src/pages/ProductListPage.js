@@ -23,20 +23,7 @@ const ProductListPage = () => {
         return value;
     }, []);
 
-    const getFullImageUrl = useCallback((relativePath) => {
-        if (!relativePath) {
-            return 'https://placehold.co/400x200/cccccc/000000?text=Sin+Imagen';
-        }
-        const baseUrlWithoutApi = api.defaults.baseURL.replace('/api', '');
-        
-        if (relativePath.startsWith('/api/images/')) {
-            return `${baseUrlWithoutApi}${relativePath}`;
-        } else {
-            return `${api.defaults.baseURL}/images/${relativePath}`;
-        }
-    }, []);
-
-    const fetchProducts = useCallback(async () => { // Añadido useCallback para memoizar la función
+    const fetchProducts = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
@@ -59,11 +46,11 @@ const ProductListPage = () => {
         } finally {
             setLoading(false);
         }
-    }, [renderSafeValue]); // Dependencia para useCallback, ya que renderSafeValue se usa dentro
+    }, [renderSafeValue]);
 
     useEffect(() => {
         fetchProducts();
-    }, [fetchProducts]); // <-- 'fetchProducts' añadido aquí para resolver la advertencia de dependencia
+    }, [fetchProducts]);
 
     const handleAddProductClick = () => {
         navigate('/products/add');
@@ -80,7 +67,6 @@ const ProductListPage = () => {
 
     const confirmDeleteProduct = async () => {
         try {
-            // Se usa productToDelete.id para coincidir con la respuesta del backend
             await api.delete(`/products/${productToDelete.id}`); 
             setShowDeleteModal(false);
             setProductToDelete(null);
@@ -128,13 +114,11 @@ const ProductListPage = () => {
                     <p className="text-muted">Cargando productos, por favor espera...</p>
                     <Row className="mt-4 w-100 justify-content-center">
                         {Array.from({ length: 4 }).map((_, index) => (
-                            // Se usa el index como key para los placeholders, ya que son estáticos
                             <Col key={index} xs={12} sm={6} md={4} lg={3} className="mb-4"> 
                                 <div className="placeholder-glow">
                                     <div className="card h-100 shadow-sm rounded-lg" style={{ border: '1px solid #e0e0e0' }}>
                                         <div className="card-img-top bg-light" style={{ height: '180px', width: '100%' }}></div>
                                         <div className="card-body p-3">
-                                            {/* Añadido contenido para accesibilidad */}
                                             <h5 className="card-title placeholder col-8 mb-2">Cargando Título</h5> 
                                             <p className="card-text placeholder col-6">Cargando descripción</p>
                                             <p className="card-text placeholder col-4">Cargando precio</p>
@@ -158,12 +142,11 @@ const ProductListPage = () => {
             ) : (
                 <Row xs={1} md={2} lg={3} className="g-4">
                     {products.map(product => (
-                        // Se usa product.id como key, ya que es el identificador único del backend
                         <Col key={product.id}> 
                             <Card className="h-100 shadow-sm rounded-lg">
                                 <Image
                                     variant="top"
-                                    src={getFullImageUrl(product.imagen_url)}
+                                    src={product.imagen_url}
                                     alt={renderSafeValue(product.nombre, 'Producto sin nombre')}
                                     style={{ height: '200px', width: '100%', objectFit: 'cover' }}
                                     loading="lazy"
@@ -185,11 +168,9 @@ const ProductListPage = () => {
                                         </h5>
                                         {user && user.role === 'admin' && (
                                             <div className="d-flex justify-content-between mt-3">
-                                                {/* Se pasa product.id para la edición */}
                                                 <Button variant="warning" size="sm" onClick={() => handleEditProductClick(product.id)} className="me-2 flex-grow-1">
                                                     Editar
                                                 </Button>
-                                                {/* Se pasa el objeto product completo para el modal de eliminación */}
                                                 <Button variant="danger" size="sm" onClick={() => handleDeleteProduct(product)} className="flex-grow-1">
                                                     Eliminar
                                                 </Button>
@@ -203,7 +184,6 @@ const ProductListPage = () => {
                 </Row>
             )}
 
-            {/* Modal de confirmación de eliminación */}
             <Modal show={showDeleteModal} onHide={cancelDeleteProduct} centered>
                 <Modal.Header closeButton>
                     <Modal.Title>Confirmar Eliminación</Modal.Title>
@@ -225,4 +205,3 @@ const ProductListPage = () => {
 };
 
 export default ProductListPage;
-
