@@ -28,12 +28,9 @@ const ProductListPage = () => {
         setError(null);
         try {
             const response = await api.get('/products');
-            const saleProducts = Array.isArray(response.data) ?
-                response.data.filter(product =>
-                    (renderSafeValue(product.precio) !== null && renderSafeValue(product.precio) !== undefined) &&
-                    (renderSafeValue(product.puntos_canje) === null || renderSafeValue(product.puntos_canje) === undefined)
-                ) : [];
-            setProducts(saleProducts);
+            // Ahora mostramos todos los productos, sin filtrar por ofertas o canjes
+            const allProducts = Array.isArray(response.data) ? response.data : [];
+            setProducts(allProducts);
         } catch (err) {
             console.error("Error al obtener los productos:", err);
             if (err.response) {
@@ -46,7 +43,7 @@ const ProductListPage = () => {
         } finally {
             setLoading(false);
         }
-    }, [renderSafeValue]);
+    }, []); // <-- Se ha eliminado renderSafeValue de aquí
 
     useEffect(() => {
         fetchProducts();
@@ -98,7 +95,7 @@ const ProductListPage = () => {
     return (
         <Container className="my-5">
             <div className="d-flex justify-content-between align-items-center mb-4">
-                <h1 className="text-dark">Nuestras Ofertas y Productos en Venta</h1>
+                <h1 className="text-dark">Nuestros Productos</h1>
                 {user && user.role === 'admin' && (
                     <Button variant="success" onClick={handleAddProductClick}>
                         + Añadir Producto
@@ -160,12 +157,18 @@ const ProductListPage = () => {
                                         {renderSafeValue(product.descripcion) || 'Sin descripción.'}
                                     </Card.Text>
                                     <div className="mt-auto">
-                                        <h5 className="text-primary mb-2">
-                                            ${renderSafeValue(product.precio) !== null && renderSafeValue(product.precio) !== undefined
-                                                ? parseFloat(renderSafeValue(product.precio)).toFixed(2)
-                                                : 'N/A'
-                                            }
-                                        </h5>
+                                        {/* Lógica para mostrar Precio o Puntos de Canje */}
+                                        {product.precio ? (
+                                            <h5 className="text-primary mb-2">
+                                                ${parseFloat(product.precio).toFixed(2)}
+                                            </h5>
+                                        ) : product.puntos_canje ? (
+                                            <h5 className="text-success mb-2">
+                                                {product.puntos_canje} Puntos
+                                            </h5>
+                                        ) : (
+                                            <h5 className="text-muted mb-2">N/A</h5>
+                                        )}
                                         {user && user.role === 'admin' && (
                                             <div className="d-flex justify-content-between mt-3">
                                                 <Button variant="warning" size="sm" onClick={() => handleEditProductClick(product.id)} className="me-2 flex-grow-1">
