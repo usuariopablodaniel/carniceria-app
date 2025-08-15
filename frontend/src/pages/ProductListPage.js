@@ -26,6 +26,9 @@ const ProductListPage = () => {
         setLoading(true);
         setError(null);
         try {
+            // Este console.log es para verificar que el archivo es diferente
+            console.log("Fetch de productos iniciado."); 
+
             const response = await api.get('/products');
             const allProducts = Array.isArray(response.data) ? response.data : [];
 
