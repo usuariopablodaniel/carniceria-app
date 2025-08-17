@@ -1,4 +1,3 @@
-// frontend/src/pages/ProductListPage.js
 import React, { useEffect, useState, useCallback } from 'react';
 import { Container, Row, Col, Spinner, Alert, Button, Card, Image, Modal } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
@@ -28,8 +27,6 @@ const ProductListPage = () => {
         try {
             const response = await api.get('/products');
             const allProducts = Array.isArray(response.data) ? response.data : [];
-
-            // Filtramos los productos en dos listas separadas y precisas
             const saleItems = allProducts.filter(product => product.precio && !product.puntos_canje);
             const pointsItems = allProducts.filter(product => product.puntos_canje && !product.precio);
 
