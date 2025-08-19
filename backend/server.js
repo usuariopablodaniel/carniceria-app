@@ -32,21 +32,21 @@ const notificationRoutes = require('./routes/notifications');
 // el 'origin' debe permitir la URL de Vercel.
 const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
 app.use(cors({
-    origin: clientUrl,
-    credentials: true 
+    origin: clientUrl,
+    credentials: true 
 }));
 
 // === CORRECCIÓN CLAVE: CONFIGURACIÓN DE SESIONES ===
 // 'secure: true' es necesario para cookies en producción.
 // 'sameSite: "none"' también es necesario para que funcione con dominios cruzados (Vercel -> Render).
 app.use(session({
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: { 
-        secure: true, 
-        sameSite: 'none'
-    }
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: { 
+        secure: true, 
+        sameSite: 'none'
+    }
 }));
 
 
@@ -59,6 +59,27 @@ app.use(passport.session());
 // Nota: 'express.json()' y 'express.urlencoded' deben ir ANTES de las rutas que las usan.
 app.use(express.json()); 
 app.use(express.urlencoded({ extended: true }));
+
+// >>>>>>>>>>>>>>>> NUEVO MIDDLEWARE DE LIMPIEZA DE DATOS <<<<<<<<<<<<<<<<
+// Este middleware limpia todos los caracteres de espacio de no separación (\u00A0)
+// de todo el cuerpo de la solicitud, previniendo el error en la base de datos.
+app.use((req, res, next) => {
+    if (req.body && typeof req.body === 'object') {
+        const cleanObject = (obj) => {
+            for (const key in obj) {
+                if (typeof obj[key] === 'string') {
+                    obj[key] = obj[key].replace(/\u00A0/g, ' ').trim();
+                } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+                    cleanObject(obj[key]);
+                }
+            }
+        };
+        cleanObject(req.body);
+    }
+    next();
+});
+// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 app.use('/api/products', productRoutes); 
 app.use('/api/auth', authRoutes); 
 app.use('/api/transactions', transactionRoutes); 
@@ -68,41 +89,41 @@ app.use('/api/notifications', notificationRoutes);
 
 // --- Rutas de Prueba para Verificar el Backend ---
 app.get('/', (req, res) => {
-    res.send('Backend de la Carnicería funcionando!');
+    res.send('Backend de la Carnicería funcionando!');
 });
 
 app.get('/db-test', async (req, res) => {
-    try {
-        const client = await pool.connect();
-        const result = await client.query('SELECT NOW()');
-        client.release();
-        res.json({ message: 'Conexión a la base de datos exitosa!', time: result.rows[0].now });
-    } catch (err) {
-        console.error('Error al conectar a la base de datos:', err);
-        res.status(500).json({ error: 'Error al conectar a la base de datos', details: err.message });
-    }
+    try {
+        const client = await pool.connect();
+        const result = await client.query('SELECT NOW()');
+        client.release();
+        res.json({ message: 'Conexión a la base de datos exitosa!', time: result.rows[0].now });
+    } catch (err) {
+        console.error('Error al conectar a la base de datos:', err);
+        res.status(500).json({ error: 'Error al conectar a la base de datos', details: err.message });
+    }
 });
 
 // Middleware de manejo de errores centralizado (al final)
 app.use((err, req, res, next) => {
-    console.error('ERROR GLOBAL de Express:', err.stack);
-    if (res.headersSent) {
-        return next(err);
-    }
-    res.status(err.statusCode || 500).json({
-        message: err.message || 'Error interno del servidor.',
-        error: process.env.NODE_ENV === 'development' ? err.stack : {}
-    });
+    console.error('ERROR GLOBAL de Express:', err.stack);
+    if (res.headersSent) {
+        return next(err);
+    }
+    res.status(err.statusCode || 500).json({
+        message: err.message || 'Error interno del servidor.',
+        error: process.env.NODE_ENV === 'development' ? err.stack : {}
+    });
 });
 
 // Middleware para manejar rutas no encontradas (404) para el resto de la API
 app.use((req, res) => {
-    if (!res.headersSent) { 
-        res.status(404).json({ error: 'Ruta de API no encontrada.' });
-    }
+    if (!res.headersSent) { 
+        res.status(404).json({ error: 'Ruta de API no encontrada.' });
+    }
 });
 
 // Iniciar el servidor
 app.listen(port, () => {
-    console.log(`Servidor backend corriendo en el puerto ${port}`);
+    console.log(`Servidor backend corriendo en el puerto ${port}`);
 });
