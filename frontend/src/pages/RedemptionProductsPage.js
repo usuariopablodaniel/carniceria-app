@@ -12,26 +12,22 @@ const RedemptionProductsPage = () => {
     const [error, setError] = useState(null);
     const [userPoints, setUserPoints] = useState(null);
 
-    // Función auxiliar para construir la URL completa de la imagen
     const getFullImageUrl = useCallback((relativePath) => {
         if (!relativePath) {
             return null; 
         }
-        // Construye la URL base del backend sin el '/api' final
         const baseUrlWithoutApi = api.defaults.baseURL.replace('/api', '');
 
-        // Si la ruta ya incluye '/api/images/', la usamos directamente con la base URL completa
         if (relativePath.startsWith('/api/images/')) {
             return `${baseUrlWithoutApi}${relativePath}`; 
         } else {
-            // Si no, asumimos que es solo el nombre del archivo y construimos la URL completa
             return `${api.defaults.baseURL}/images/${relativePath}`; 
         }
-    }, []); // Dependencias: api.defaults.baseURL es una constante, no necesita ser una dependencia si no cambia.
+    }, []);
 
     const fetchUserPoints = useCallback(async () => {
         if (!isAuthenticated || !user || !user.id) {
-            setUserPoints(0); // Establecer a 0 si no está autenticado o no hay usuario/ID
+            setUserPoints(0);
             return;
         }
         try {
@@ -39,9 +35,9 @@ const RedemptionProductsPage = () => {
             setUserPoints(response.data.points);
         } catch (err) {
             console.error('Error al obtener los puntos del usuario:', err);
-            setUserPoints(null); // Establecer a null en caso de error
+            setUserPoints(null);
         }
-    }, [isAuthenticated, user]); // Dependencias: isAuthenticated y user son necesarias aquí.
+    }, [isAuthenticated, user]);
 
     const fetchRedemptionProducts = useCallback(async () => { 
         setLoading(true);
@@ -56,17 +52,17 @@ const RedemptionProductsPage = () => {
         } finally {
             setLoading(false);
         }
-    }, []); // Dependencias: No se necesita 'api' aquí porque es una constante y no muta. fetchRedemptionProducts solo depende de sí misma.
+    }, []);
 
     useEffect(() => {
         if (!loadingAuth) {
             fetchUserPoints();
         }
-    }, [isAuthenticated, user, loadingAuth, fetchUserPoints]); // Dependencias: fetchUserPoints es una dependencia.
+    }, [isAuthenticated, user, loadingAuth, fetchUserPoints]);
 
     useEffect(() => {
         fetchRedemptionProducts();
-    }, [fetchRedemptionProducts]); // Dependencias: fetchRedemptionProducts es una dependencia.
+    }, [fetchRedemptionProducts]);
 
     const handleAddProductClick = () => {
         navigate('/products/add');
@@ -77,13 +73,10 @@ const RedemptionProductsPage = () => {
     };
 
     const handleDeleteProduct = async (productId) => {
-        // >>>>>>>>>>>>>>> NOTA: window.confirm no funciona en entornos de iFrame. <<<<<<<<<<<<<<<<
-        // Para una aplicación en producción, deberías reemplazar esto con un modal de confirmación personalizado.
         if (window.confirm('¿Estás seguro de que quieres eliminar este producto de canje?')) {
             try {
                 await api.delete(`/products/${productId}`); 
-                // console.log(`Producto de canje con ID ${productId} eliminado.`); // Eliminado
-                fetchRedemptionProducts(); // Volver a cargar la lista después de eliminar
+                fetchRedemptionProducts();
             } catch (err) {
                 console.error("Error al eliminar el producto de canje:", err);
                 setError("No se pudo eliminar el producto de canje. Intenta de nuevo.");
@@ -91,15 +84,18 @@ const RedemptionProductsPage = () => {
         }
     };
 
-    const handleRedeemClick = (productName) => {
-        if (isAuthenticated) {
+    // <==== LÓGICA DE CANJEO MODIFICADA ====>
+    const handleRedeemClick = (product) => { // AHORA RECIBE EL OBJETO PRODUCTO COMPLETO
+        if (isAuthenticated && (user.role === 'user' || user.role === 'employee')) {
             navigate('/dashboard', {
                 state: {
-                    message: `¡Excelente! Muestra tu código QR al vendedor para canjear "${productName}".`,
+                    canjeo: true, // Indicador de que venimos de la página de canjeo
+                    productToRedeem: product, // Pasamos el objeto del producto completo
+                    message: `¡Excelente! Muestra tu código QR al vendedor para canjear "${product.nombre}".`,
                     variant: 'success'
                 }
             });
-        } else {
+        } else if (!isAuthenticated) {
             navigate('/login', {
                 state: {
                     message: 'Inicia sesión para canjear puntos.',
@@ -186,7 +182,7 @@ const RedemptionProductsPage = () => {
                                                 <Button
                                                     variant="success"
                                                     className="w-100"
-                                                    onClick={() => handleRedeemClick(product.nombre)}
+                                                    onClick={() => handleRedeemClick(product)} // <== CAMBIO AQUI: PASAMOS EL OBJETO PRODUCTO
                                                 >
                                                     ¡Canjear Ahora!
                                                 </Button>
