@@ -137,8 +137,17 @@ const ProductAddPage = () => {
         const dataToSend = new FormData();
         dataToSend.append('nombre', formData.nombre);
         dataToSend.append('descripcion', formData.descripcion);
-        dataToSend.append('precio', hasPriceInput ? parseFloat(formData.precio) : '');
-        dataToSend.append('puntos_canje', hasPointsInput ? parseInt(formData.puntos_canje) : '');
+        
+        // CORRECCIÓN: Aquí es donde se hace el cambio.
+        // Ahora solo agregamos el campo si tiene un valor para evitar enviar cadenas vacías.
+        if (hasPriceInput) {
+            dataToSend.append('precio', parseFloat(formData.precio));
+        }
+        if (hasPointsInput) {
+            dataToSend.append('puntos_canje', parseInt(formData.puntos_canje));
+        }
+        // FIN DE LA CORRECCIÓN
+
         dataToSend.append('stock', parsedStock);
         dataToSend.append('unidad_de_medida', formData.unidad_de_medida);
         dataToSend.append('categoria', formData.categoria);
@@ -148,7 +157,7 @@ const ProductAddPage = () => {
         if (imageFile) {
             dataToSend.append('imagen', imageFile);
         } else {
-             // Si no hay archivo, puedes enviar un placeholder o un valor vacío
+             // Si no hay archivo, se puede omitir o enviar un valor vacío, según el backend
              dataToSend.append('imagen', '');
         }
 
