@@ -135,18 +135,20 @@ const ProductAddPage = () => {
         }
 
         const dataToSend = new FormData();
-        dataToSend.append('nombre', formData.nombre);
-        dataToSend.append('descripcion', formData.descripcion);
+        // CORRECCIÓN: Se limpian los campos de texto de caracteres invisibles antes de enviar.
+        // También se ha corregido la lógica para no enviar campos vacíos.
+        const cleanedNombre = formData.nombre.replace(/\u00A0/g, ' ');
+        const cleanedDescripcion = formData.descripcion.replace(/\u00A0/g, ' ');
         
-        // CORRECCIÓN: Aquí es donde se hace el cambio.
-        // Ahora solo agregamos el campo si tiene un valor para evitar enviar cadenas vacías.
+        dataToSend.append('nombre', cleanedNombre);
+        dataToSend.append('descripcion', cleanedDescripcion);
+
         if (hasPriceInput) {
             dataToSend.append('precio', parseFloat(formData.precio));
         }
         if (hasPointsInput) {
             dataToSend.append('puntos_canje', parseInt(formData.puntos_canje));
         }
-        // FIN DE LA CORRECCIÓN
 
         dataToSend.append('stock', parsedStock);
         dataToSend.append('unidad_de_medida', formData.unidad_de_medida);
@@ -157,7 +159,6 @@ const ProductAddPage = () => {
         if (imageFile) {
             dataToSend.append('imagen', imageFile);
         } else {
-             // Si no hay archivo, se puede omitir o enviar un valor vacío, según el backend
              dataToSend.append('imagen', '');
         }
 
