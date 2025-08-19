@@ -1,7 +1,5 @@
-// backend/controllers/productController.js
-
 const pool = require('../db'); 
-const cloudinary = require('cloudinary').v2; // Importamos Cloudinary para la eliminación de imágenes
+const cloudinary = require('cloudinary').v2;
 
 // >>>>>>>>>>>>>>> FUNCIÓN AUXILIAR PARA ELIMINAR IMAGEN EN CLOUDINARY <<<<<<<<<<<<<<<<
 const deleteImageFromCloudinary = async (imageUrl) => {
@@ -53,8 +51,11 @@ exports.getProductById = async (req, res) => {
 // @route   POST /api/products
 // @access  Private (Admin)
 exports.addProduct = async (req, res) => {
-  const { nombre, descripcion, precio, stock, unidad_de_medida, categoria, disponible, puntos_canje } = req.body;
-  let imagen_url = req.body.imagenUrl || null;
+    // CORRECCIÓN DEFINITIVA: Limpiamos los campos de texto del backend
+    const { precio, stock, unidad_de_medida, categoria, disponible, puntos_canje } = req.body;
+    const nombre = req.body.nombre ? req.body.nombre.replace(/\u00A0/g, ' ') : '';
+    const descripcion = req.body.descripcion ? req.body.descripcion.replace(/\u00A0/g, ' ') : '';
+    let imagen_url = req.body.imagenUrl || null;
 
   const finalPrecio = (precio === undefined || precio === null || precio === '') ? null : parseFloat(precio);
   const finalPuntosCanje = (puntos_canje === undefined || puntos_canje === null || puntos_canje === '') ? null : parseInt(puntos_canje);
