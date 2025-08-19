@@ -1,6 +1,6 @@
 // frontend/src/components/GeneralNotificationBanner.js
 import React, { useState, useEffect } from 'react';
-import { Alert, Button } from 'react-bootstrap';
+import { Alert } from 'react-bootstrap';
 
 /**
  * Componente para mostrar una notificación general en forma de banner.

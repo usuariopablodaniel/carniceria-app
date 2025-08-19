@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react'; 
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Container, Form, Button, Alert, Spinner, Image, Row, Col } from 'react-bootstrap'; 
-import api from '../api/axios'; 
+import { Container, Form, Button, Alert, Spinner, Image, Row, Col } from 'react-bootstrap';
+import api from '../api/axios';
 
 const ProductEditPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { user, isAuthenticated, loadingAuth } = useAuth(); 
+    const { user, isAuthenticated, loadingAuth } = useAuth();
 
     const [formData, setFormData] = useState({
         nombre: '',
@@ -15,33 +15,33 @@ const ProductEditPage = () => {
         precio: '',
         stock: '',
         unidad_de_medida: 'kg',
-        imagen_url: '', 
-        categoria: '', 
+        imagen_url: '',
+        categoria: '',
         disponible: true,
         puntos_canje: '',
     });
-    const [imageFile, setImageFile] = useState(null); 
-    const [imagePreviewUrl, setImagePreviewUrl] = useState(''); 
+    const [imageFile, setImageFile] = useState(null);
+    const [imagePreviewUrl, setImagePreviewUrl] = useState('');
 
-    const [loadingProduct, setLoadingProduct] = useState(true); 
-    const [message, setMessage] = useState(null); 
-    const [error, setError] = useState(null); 
+    const [loadingProduct, setLoadingProduct] = useState(true);
+    const [message, setMessage] = useState(null);
+    const [error, setError] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    
+
     // Categorías mejoradas para que coincidan con ProductAddPage
     const categories = ["Ternera", "Pollo", "Cerdo", "Pescado", "Embutidos", "Otros"];
 
     const fetchProduct = useCallback(async () => {
         try {
-            if (!id || isNaN(Number(id))) { 
+            if (!id || isNaN(Number(id))) {
                 setError('ID de producto no válido o no proporcionado para edición.');
                 setLoadingProduct(false);
-                return; 
+                return;
             }
 
             const response = await api.get(`/products/${id}`);
             const productData = response.data;
-            
+
             // Llenar el estado del formulario con los datos existentes
             setFormData({
                 nombre: productData.nombre || '',
@@ -49,8 +49,8 @@ const ProductEditPage = () => {
                 precio: productData.precio !== undefined && productData.precio !== null ? String(productData.precio) : '',
                 stock: productData.stock !== undefined && productData.stock !== null ? String(productData.stock) : '',
                 unidad_de_medida: productData.unidad_de_medida || 'kg',
-                imagen_url: productData.imagen_url || '', 
-                categoria: productData.categoria || '', 
+                imagen_url: productData.imagen_url || '',
+                categoria: productData.categoria || '',
                 disponible: productData.disponible !== undefined ? productData.disponible : true,
                 puntos_canje: productData.puntos_canje !== undefined && productData.puntos_canje !== null ? String(productData.puntos_canje) : '',
             });
@@ -74,11 +74,11 @@ const ProductEditPage = () => {
         } finally {
             setLoadingProduct(false);
         }
-    }, [id]); 
+    }, [id]);
 
     useEffect(() => {
         if (loadingAuth) {
-            return; 
+            return;
         }
         if (!isAuthenticated) {
             navigate('/login', { replace: true });
@@ -86,7 +86,7 @@ const ProductEditPage = () => {
         }
         if (user && user.role !== 'admin') {
             navigate('/dashboard', { replace: true });
-            return; 
+            return;
         }
 
         fetchProduct();
@@ -96,7 +96,7 @@ const ProductEditPage = () => {
                 URL.revokeObjectURL(imagePreviewUrl);
             }
         };
-    }, [id, user, navigate, isAuthenticated, loadingAuth, fetchProduct]); 
+    }, [id, user, navigate, isAuthenticated, loadingAuth, fetchProduct, imagePreviewUrl]); // <-- **¡AQUÍ ESTÁ LA CORRECCIÓN!**
 
     const handleChange = (e) => {
         const { name, value, type, checked, files } = e.target;
@@ -104,14 +104,14 @@ const ProductEditPage = () => {
         if (type === 'file') {
             const file = files[0];
             setImageFile(file);
-            
+
             if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
                 URL.revokeObjectURL(imagePreviewUrl);
             }
             if (file) {
-                setImagePreviewUrl(URL.createObjectURL(file)); 
-            } else { 
-                setImagePreviewUrl(formData.imagen_url || ''); 
+                setImagePreviewUrl(URL.createObjectURL(file));
+            } else {
+                setImagePreviewUrl(formData.imagen_url || '');
             }
         } else {
             setFormData(prevData => {
@@ -132,19 +132,19 @@ const ProductEditPage = () => {
     const handleRemoveCurrentImage = () => {
         setFormData(prevData => ({
             ...prevData,
-            imagen_url: '' 
+            imagen_url: ''
         }));
-        setImageFile(null); 
+        setImageFile(null);
         if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
             URL.revokeObjectURL(imagePreviewUrl);
         }
-        setImagePreviewUrl(''); 
+        setImagePreviewUrl('');
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setMessage(null); 
-        setError(null); 
+        setMessage(null);
+        setError(null);
         setIsSubmitting(true);
 
         if (!formData.nombre || formData.stock === '') {
@@ -175,7 +175,7 @@ const ProductEditPage = () => {
         }
         if (hasPointsInput) {
             const parsedPoints = parseInt(formData.puntos_canje);
-            if (isNaN(parsedPoints) || parsedPoints < 0) { 
+            if (isNaN(parsedPoints) || parsedPoints < 0) {
                 setError('Los puntos de canje deben ser un número no negativo.');
                 setIsSubmitting(false);
                 return;
@@ -202,25 +202,25 @@ const ProductEditPage = () => {
         dataToSend.append('unidad_de_medida', formData.unidad_de_medida);
         dataToSend.append('categoria', formData.categoria);
         dataToSend.append('disponible', formData.disponible);
-        
+
         // Lógica de manejo de imagen
-        if (imageFile) { 
-            dataToSend.append('imagen', imageFile); 
-        } else if (formData.imagen_url === '') { 
-            dataToSend.append('imagen_url_clear', 'true'); 
+        if (imageFile) {
+            dataToSend.append('imagen', imageFile);
+        } else if (formData.imagen_url === '') {
+            dataToSend.append('imagen_url_clear', 'true');
         }
 
         try {
             const response = await api.put(`/products/${id}`, dataToSend, {
                 headers: {
-                    'Content-Type': 'multipart/form-data' 
+                    'Content-Type': 'multipart/form-data'
                 }
             });
 
             if (response.status === 200) {
                 setMessage('Producto actualizado exitosamente!');
-                setImageFile(null); 
-                
+                setImageFile(null);
+
                 // Actualizar el estado del formulario y la previsualización con la nueva imagen de la respuesta
                 if (response.data.product && response.data.product.imagen_url) {
                     setFormData(prevData => ({ ...prevData, imagen_url: response.data.product.imagen_url }));
@@ -232,7 +232,7 @@ const ProductEditPage = () => {
 
                 setTimeout(() => {
                     navigate('/products');
-                }, 1500); 
+                }, 1500);
             } else {
                 setError(response.data.error || 'Error desconocido al actualizar el producto.');
             }
@@ -282,7 +282,7 @@ const ProductEditPage = () => {
             {message && <Alert variant="success" onClose={() => setMessage(null)} dismissible>{message}</Alert>}
             {error && <Alert variant="danger" onClose={() => setError(null)} dismissible>{error}</Alert>}
 
-            <Form onSubmit={handleSubmit} encType="multipart/form-data"> 
+            <Form onSubmit={handleSubmit} encType="multipart/form-data">
                 <Form.Group className="mb-3" controlId="nombre">
                     <Form.Label>Nombre del Producto</Form.Label>
                     <Form.Control
@@ -370,28 +370,28 @@ const ProductEditPage = () => {
                     <Form.Control
                         type="file"
                         name="imagen"
-                        onChange={handleChange} 
+                        onChange={handleChange}
                         accept="image/*"
                     />
                     {imagePreviewUrl && (
                         <div className="mt-2 text-center">
                             <p className="text-muted mb-1">Previsualización:</p>
-                            <Image 
-                                src={imagePreviewUrl} 
-                                alt="Previsualización del producto" 
-                                fluid 
-                                style={{ width: '100%', maxWidth: '200px', height: 'auto', maxHeight: '200px', objectFit: 'contain', border: '1px solid #ddd', borderRadius: '4px' }} 
-                                loading="lazy" 
+                            <Image
+                                src={imagePreviewUrl}
+                                alt="Previsualización del producto"
+                                fluid
+                                style={{ width: '100%', maxWidth: '200px', height: 'auto', maxHeight: '200px', objectFit: 'contain', border: '1px solid #ddd', borderRadius: '4px' }}
+                                loading="lazy"
                             />
                             {imageFile && <Form.Text className="text-muted d-block mt-1">Archivo seleccionado: {imageFile.name}</Form.Text>}
                             {!imageFile && formData.imagen_url && (
                                 <Form.Text className="text-muted d-block mt-1">Imagen actual (no se ha subido una nueva)</Form.Text>
                             )}
                             {(formData.imagen_url || imageFile) && (
-                                <Button 
-                                    variant="outline-danger" 
-                                    size="sm" 
-                                    className="mt-2" 
+                                <Button
+                                    variant="outline-danger"
+                                    size="sm"
+                                    className="mt-2"
                                     onClick={handleRemoveCurrentImage}
                                 >
                                     Eliminar Imagen Actual
@@ -412,9 +412,9 @@ const ProductEditPage = () => {
                         name="categoria"
                         value={formData.categoria}
                         onChange={handleChange}
-                        required 
+                        required
                     >
-                        <option value="">-- Selecciona una categoría --</option> 
+                        <option value="">-- Selecciona una categoría --</option>
                         {categories.map(cat => (
                             <option key={cat} value={cat}>{cat}</option>
                         ))}
