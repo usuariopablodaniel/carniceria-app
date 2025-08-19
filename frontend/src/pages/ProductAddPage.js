@@ -65,21 +65,15 @@ const ProductAddPage = () => {
                 setImagePreviewUrl('');
             }
         } else {
-            // CORRECCIÓN DEFINITIVA: Limpiamos el valor en el origen
-            let cleanedValue = value;
-            if (typeof value === 'string') {
-                cleanedValue = value.replace(/\u00A0/g, ' ').trim();
-            }
-
             setFormData(prevData => {
                 const newData = {
                     ...prevData,
-                    [name]: type === 'checkbox' ? checked : cleanedValue,
+                    [name]: type === 'checkbox' ? checked : value,
                 };
                 // Lógica para asegurar que solo se ingrese precio O puntos de canje
-                if (name === 'precio' && cleanedValue !== '' && newData.puntos_canje !== '') {
+                if (name === 'precio' && value !== '' && newData.puntos_canje !== '') {
                     newData.puntos_canje = '';
-                } else if (name === 'puntos_canje' && cleanedValue !== '' && newData.precio !== '') {
+                } else if (name === 'puntos_canje' && value !== '' && newData.precio !== '') {
                     newData.precio = '';
                 }
                 return newData;
@@ -136,8 +130,12 @@ const ProductAddPage = () => {
         }
 
         const dataToSend = new FormData();
-        dataToSend.append('nombre', formData.nombre);
-        dataToSend.append('descripcion', formData.descripcion);
+        // CORRECCIÓN DEFINITIVA: Limpiamos los campos de texto de caracteres invisibles justo antes de enviarlos.
+        const cleanedNombre = formData.nombre.replace(/\u00A0/g, ' ');
+        const cleanedDescripcion = formData.descripcion.replace(/\u00A0/g, ' ');
+        
+        dataToSend.append('nombre', cleanedNombre);
+        dataToSend.append('descripcion', cleanedDescripcion);
 
         if (hasPriceInput) {
             dataToSend.append('precio', parseFloat(formData.precio));
