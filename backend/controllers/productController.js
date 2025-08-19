@@ -52,10 +52,13 @@ exports.getProductById = async (req, res) => {
 // @access  Private (Admin)
 exports.addProduct = async (req, res) => {
     // CORRECCIÓN DEFINITIVA: Limpiamos los campos de texto del backend
+    const nombre = req.body.nombre ? req.body.nombre.replace(/\u00A0/g, ' ').trim() : '';
+    const descripcion = req.body.descripcion ? req.body.descripcion.replace(/\u00A0/g, ' ').trim() : '';
     const { precio, stock, unidad_de_medida, categoria, disponible, puntos_canje } = req.body;
-    const nombre = req.body.nombre ? req.body.nombre.replace(/\u00A0/g, ' ') : '';
-    const descripcion = req.body.descripcion ? req.body.descripcion.replace(/\u00A0/g, ' ') : '';
     let imagen_url = req.body.imagenUrl || null;
+
+    // >>>>>>>>>>>>>>> DIAGNÓSTICO: Muestra lo que recibes <<<<<<<<<<<<<<<<
+    console.log(`Recibiendo datos: Nombre - '${nombre}', Descripción - '${descripcion}'`);
 
   const finalPrecio = (precio === undefined || precio === null || precio === '') ? null : parseFloat(precio);
   const finalPuntosCanje = (puntos_canje === undefined || puntos_canje === null || puntos_canje === '') ? null : parseInt(puntos_canje);
@@ -73,7 +76,7 @@ exports.addProduct = async (req, res) => {
   if (stock === undefined || stock === null || stock === '') {
     await handleValidationError();
     return res.status(400).json({ error: 'El stock es obligatorio.' });
-  }
+    }
   const hasPriceInput = finalPrecio !== null;
   const hasPointsInput = finalPuntosCanje !== null;
 
@@ -136,8 +139,10 @@ exports.addProduct = async (req, res) => {
 // @access  Private (Admin)
 exports.updateProduct = async (req, res) => {
   const { id } = req.params;
-  const { nombre, descripcion, precio, stock, unidad_de_medida, categoria, disponible, puntos_canje, imagen_url_clear } = req.body; 
-  let new_imagen_url = req.body.imagenUrl || null; 
+    const nombre = req.body.nombre ? req.body.nombre.replace(/\u00A0/g, ' ').trim() : undefined;
+    const descripcion = req.body.descripcion ? req.body.descripcion.replace(/\u00A0/g, ' ').trim() : undefined;
+    const { precio, stock, unidad_de_medida, categoria, disponible, puntos_canje, imagen_url_clear } = req.body; 
+    let new_imagen_url = req.body.imagenUrl || null; 
 
   const finalPrecio = (precio === undefined || precio === null || precio === '') ? null : parseFloat(precio);
   const finalPuntosCanje = (puntos_canje === undefined || puntos_canje === null || puntos_canje === '') ? null : parseInt(puntos_canje);
