@@ -34,7 +34,7 @@ router.post(
     authorizeRoles('admin'), 
     upload.single('imagen'), 
     uploadToCloudinary, 
-    cleanBodyMiddleware, // <<-- NUEVO MIDDLEWARE DE LIMPIEZA
+    cleanBodyMiddleware, 
     productController.addProduct
 );
 
@@ -45,7 +45,7 @@ router.put(
     authorizeRoles('admin'), 
     upload.single('imagen'), 
     uploadToCloudinary, 
-    cleanBodyMiddleware, // <<-- NUEVO MIDDLEWARE DE LIMPIEZA
+    cleanBodyMiddleware, 
     productController.updateProduct
 );
 
