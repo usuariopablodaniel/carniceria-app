@@ -11,6 +11,18 @@ const productController = require('../controllers/productController');
 
 // --- Rutas de Gestión de Productos ---
 
+// Middleware de limpieza para usar en las rutas
+const cleanBodyMiddleware = (req, res, next) => {
+    if (req.body && typeof req.body === 'object') {
+        for (const key in req.body) {
+            if (typeof req.body[key] === 'string') {
+                req.body[key] = req.body[key].replace(/\u00A0/g, ' ').trim();
+            }
+        }
+    }
+    next();
+};
+
 router.get('/', productController.getProducts);
 
 router.get('/:id', productController.getProductById);
@@ -22,6 +34,7 @@ router.post(
     authorizeRoles('admin'), 
     upload.single('imagen'), 
     uploadToCloudinary, 
+    cleanBodyMiddleware, // <<-- NUEVO MIDDLEWARE DE LIMPIEZA
     productController.addProduct
 );
 
@@ -32,6 +45,7 @@ router.put(
     authorizeRoles('admin'), 
     upload.single('imagen'), 
     uploadToCloudinary, 
+    cleanBodyMiddleware, // <<-- NUEVO MIDDLEWARE DE LIMPIEZA
     productController.updateProduct
 );
 

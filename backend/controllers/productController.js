@@ -4,10 +4,7 @@ const cloudinary = require('cloudinary').v2;
 // >>>>>>>>>>>>>>> FUNCIÓN AUXILIAR PARA ELIMINAR IMAGEN EN CLOUDINARY <<<<<<<<<<<<<<<<
 const deleteImageFromCloudinary = async (imageUrl) => {
   if (!imageUrl) return;
-
-  // Extraer el publicId de la URL de Cloudinary
   const publicId = imageUrl.split('/').pop().split('.')[0];
-  
   try {
     await cloudinary.uploader.destroy(publicId);
     console.log(`Imagen con publicId ${publicId} eliminada de Cloudinary.`);
@@ -51,21 +48,16 @@ exports.getProductById = async (req, res) => {
 // @route   POST /api/products
 // @access  Private (Admin)
 exports.addProduct = async (req, res) => {
-    // CORRECCIÓN DEFINITIVA: Limpiamos los campos de texto del backend
-    const nombre = req.body.nombre ? req.body.nombre.replace(/\u00A0/g, ' ').trim() : '';
-    const descripcion = req.body.descripcion ? req.body.descripcion.replace(/\u00A0/g, ' ').trim() : '';
-    const { precio, stock, unidad_de_medida, categoria, disponible, puntos_canje } = req.body;
+    // La data ya ha sido limpiada por el middleware 'cleanBodyMiddleware'
+    const { nombre, descripcion, precio, stock, unidad_de_medida, categoria, disponible, puntos_canje } = req.body;
     let imagen_url = req.body.imagenUrl || null;
-
-    // >>>>>>>>>>>>>>> DIAGNÓSTICO: Muestra lo que recibes <<<<<<<<<<<<<<<<
-    console.log(`Recibiendo datos: Nombre - '${nombre}', Descripción - '${descripcion}'`);
 
   const finalPrecio = (precio === undefined || precio === null || precio === '') ? null : parseFloat(precio);
   const finalPuntosCanje = (puntos_canje === undefined || puntos_canje === null || puntos_canje === '') ? null : parseInt(puntos_canje);
 
   const handleValidationError = async () => {
-    if (req.body.imagenUrl) {
-      await deleteImageFromCloudinary(req.body.imagenUrl);
+    if (imagen_url) {
+      await deleteImageFromCloudinary(imagen_url);
     }
   };
 
@@ -76,7 +68,7 @@ exports.addProduct = async (req, res) => {
   if (stock === undefined || stock === null || stock === '') {
     await handleValidationError();
     return res.status(400).json({ error: 'El stock es obligatorio.' });
-    }
+  }
   const hasPriceInput = finalPrecio !== null;
   const hasPointsInput = finalPuntosCanje !== null;
 
@@ -139,10 +131,8 @@ exports.addProduct = async (req, res) => {
 // @access  Private (Admin)
 exports.updateProduct = async (req, res) => {
   const { id } = req.params;
-    const nombre = req.body.nombre ? req.body.nombre.replace(/\u00A0/g, ' ').trim() : undefined;
-    const descripcion = req.body.descripcion ? req.body.descripcion.replace(/\u00A0/g, ' ').trim() : undefined;
-    const { precio, stock, unidad_de_medida, categoria, disponible, puntos_canje, imagen_url_clear } = req.body; 
-    let new_imagen_url = req.body.imagenUrl || null; 
+  const { nombre, descripcion, precio, stock, unidad_de_medida, categoria, disponible, puntos_canje, imagen_url_clear } = req.body; 
+  let new_imagen_url = req.body.imagenUrl || null; 
 
   const finalPrecio = (precio === undefined || precio === null || precio === '') ? null : parseFloat(precio);
   const finalPuntosCanje = (puntos_canje === undefined || puntos_canje === null || puntos_canje === '') ? null : parseInt(puntos_canje);
