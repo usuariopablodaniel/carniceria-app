@@ -40,7 +40,6 @@ const ProductAddPage = () => {
     }, [user, navigate, isAuthenticated, loadingAuth]);
 
     useEffect(() => {
-        // Limpiar la URL de previsualización cuando el componente se desmonte
         return () => {
             if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
                 URL.revokeObjectURL(imagePreviewUrl);
@@ -48,17 +47,24 @@ const ProductAddPage = () => {
         };
     }, [imagePreviewUrl]);
 
+    // Función mejorada para limpiar caracteres invisibles
+    const cleanString = (str) => {
+        if (!str) return str;
+        // Elimina espacios no breakables, espacios múltiples y trim
+        return str.replace(/\u00A0/g, ' ')
+                  .replace(/\s+/g, ' ')
+                  .trim();
+    };
+
     const handleChange = (e) => {
         const { name, value, type, checked, files } = e.target;
 
         if (type === 'file') {
             const file = files[0];
             setImageFile(file);
-            // Revocar URL anterior si existe
             if (imagePreviewUrl) {
                 URL.revokeObjectURL(imagePreviewUrl);
             }
-            // Crear nueva URL de previsualización si hay un archivo
             if (file) {
                 setImagePreviewUrl(URL.createObjectURL(file)); 
             } else {
@@ -70,7 +76,7 @@ const ProductAddPage = () => {
                     ...prevData,
                     [name]: type === 'checkbox' ? checked : value,
                 };
-                // Lógica para asegurar que solo se ingrese precio O puntos de canje
+                
                 if (name === 'precio' && value !== '' && newData.puntos_canje !== '') {
                     newData.puntos_canje = '';
                 } else if (name === 'puntos_canje' && value !== '' && newData.precio !== '') {
@@ -93,6 +99,7 @@ const ProductAddPage = () => {
             setIsSubmitting(false);
             return;
         }
+        
         const hasPriceInput = formData.precio !== '' && formData.precio !== null;
         const hasPointsInput = formData.puntos_canje !== '' && formData.puntos_canje !== null;
 
@@ -101,6 +108,7 @@ const ProductAddPage = () => {
             setIsSubmitting(false);
             return;
         }
+        
         if (hasPriceInput) {
             const parsedPrice = parseFloat(formData.precio);
             if (isNaN(parsedPrice) || parsedPrice <= 0) {
@@ -109,6 +117,7 @@ const ProductAddPage = () => {
                 return;
             }
         }
+        
         if (hasPointsInput) {
             const parsedPoints = parseInt(formData.puntos_canje);
             if (isNaN(parsedPoints) || parsedPoints < 0) { 
@@ -117,12 +126,14 @@ const ProductAddPage = () => {
                 return;
             }
         }
+        
         const parsedStock = parseInt(formData.stock);
         if (isNaN(parsedStock) || parsedStock < 0) {
             setError('El stock debe ser un número no negativo.');
             setIsSubmitting(false);
             return;
         }
+        
         if (!formData.categoria || formData.categoria === '') {
             setError('Debe seleccionar una categoría para el producto.');
             setIsSubmitting(false);
@@ -130,30 +141,34 @@ const ProductAddPage = () => {
         }
 
         const dataToSend = new FormData();
-        // CORRECCIÓN DEFINITIVA: Limpiamos los campos de texto de caracteres invisibles justo antes de enviarlos.
-        const cleanedNombre = formData.nombre.replace(/\u00A0/g, ' ');
-        const cleanedDescripcion = formData.descripcion.replace(/\u00A0/g, ' ');
         
-        dataToSend.append('nombre', cleanedNombre);
-        dataToSend.append('descripcion', cleanedDescripcion);
+        // Limpieza exhaustiva de todos los campos de texto
+        dataToSend.append('nombre', cleanString(formData.nombre));
+        dataToSend.append('descripcion', cleanString(formData.descripcion));
+        dataToSend.append('categoria', cleanString(formData.categoria));
+        dataToSend.append('unidad_de_medida', cleanString(formData.unidad_de_medida));
 
+        // Asegurar que los valores numéricos sean números, no strings
         if (hasPriceInput) {
             dataToSend.append('precio', parseFloat(formData.precio));
+        } else {
+            dataToSend.append('precio', ''); // Enviar vacío en lugar de null
         }
+        
         if (hasPointsInput) {
             dataToSend.append('puntos_canje', parseInt(formData.puntos_canje));
+        } else {
+            dataToSend.append('puntos_canje', ''); // Enviar vacío en lugar de null
         }
 
         dataToSend.append('stock', parsedStock);
-        dataToSend.append('unidad_de_medida', formData.unidad_de_medida);
-        dataToSend.append('categoria', formData.categoria);
         dataToSend.append('disponible', formData.disponible);
         
         // Añadir el archivo de imagen si existe
         if (imageFile) {
             dataToSend.append('imagen', imageFile);
         } else {
-             dataToSend.append('imagen', '');
+            dataToSend.append('imagen', '');
         }
 
         try {
@@ -186,7 +201,13 @@ const ProductAddPage = () => {
         } catch (err) {
             console.error('Error al añadir producto:', err);
             if (err.response) {
-                setError(err.response.data.error || 'Error al añadir el producto (respuesta del servidor).');
+                // Mejor manejo de errores del servidor
+                const serverError = err.response.data;
+                if (serverError.error && serverError.error.includes('syntax error')) {
+                    setError('Error en el formato de los datos. Verifique que todos los campos estén correctamente completados.');
+                } else {
+                    setError(serverError.error || 'Error al añadir el producto (respuesta del servidor).');
+                }
             } else if (err.request) {
                 setError('No se pudo conectar con el servidor. Intenta de nuevo más tarde.');
             } else {
