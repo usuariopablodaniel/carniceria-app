@@ -17,7 +17,8 @@ import ProductListPage from './pages/ProductListPage';
 import RegisterPage from './pages/RegisterPage';
 import GoogleAuthCallback from './pages/GoogleAuthCallback';
 import ProductEditPage from './pages/ProductEditPage';
-import RedemptionProductsPage from './pages/RedemptionProductsPage';
+// Se cambia la importación del componente
+import RedeemProductsPage from './pages/RedeemProductsPage';
 import ScanQRPage from './pages/ScanQRPage';
 import UserManagementPage from './pages/UserManagementPage';
 import GeneralNotificationBanner from './components/GeneralNotificationBanner';
@@ -66,7 +67,8 @@ function App() {
                             <Route path="/auth/google/callback" element={<GoogleAuthCallback />} />
                             
                             <Route path="/products" element={<ProductListPage />} />
-                            <Route path="/redemption-products" element={<RedemptionProductsPage />} />
+                            {/* Se cambia el componente que se renderiza */}
+                            <Route path="/redemption-products" element={<RedeemProductsPage />} />
                             <Route path="/contact" element={<ContactPage />} />
 
                             {/* Ruta para solicitar el restablecimiento de contraseña */}

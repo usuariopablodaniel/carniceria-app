@@ -4,8 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 
-const ProductListPage = () => {
-    const [saleProducts, setSaleProducts] = useState([]);
+const RedeemProductsPage = () => {
+    const [pointsProducts, setPointsProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -26,8 +26,8 @@ const ProductListPage = () => {
         try {
             const response = await api.get('/products');
             const allProducts = Array.isArray(response.data) ? response.data : [];
-            const saleItems = allProducts.filter(product => product.precio && !product.puntos_canje);
-            setSaleProducts(saleItems);
+            const pointsItems = allProducts.filter(product => product.puntos_canje && !product.precio);
+            setPointsProducts(pointsItems);
         } catch (err) {
             console.error("Error al obtener los productos:", err);
             if (err.response) {
@@ -99,13 +99,9 @@ const ProductListPage = () => {
                                 {renderSafeValue(product.descripcion) || 'Sin descripción.'}
                             </Card.Text>
                             <div className="mt-auto">
-                                {product.precio ? (
-                                    <h5 className="text-primary mb-2">
-                                        ${parseFloat(product.precio).toFixed(2)}
-                                    </h5>
-                                ) : (
-                                    <h5 className="text-muted mb-2">N/A</h5>
-                                )}
+                                <h5 className="text-success mb-2">
+                                    {product.puntos_canje} Puntos
+                                </h5>
                                 {user && user.role === 'admin' && (
                                     <div className="d-flex justify-content-between mt-3">
                                         <Button variant="warning" size="sm" onClick={() => handleEditProductClick(product.id)} className="me-2 flex-grow-1">
@@ -138,7 +134,7 @@ const ProductListPage = () => {
     return (
         <Container className="my-5">
             <div className="d-flex justify-content-between align-items-center mb-4">
-                <h1 className="text-dark">Nuestras Ofertas</h1>
+                <h1 className="text-dark">Productos de Canje</h1>
                 {user && user.role === 'admin' && (
                     <Button variant="success" onClick={handleAddProductClick}>
                         + Añadir Producto
@@ -151,18 +147,22 @@ const ProductListPage = () => {
                     <Spinner animation="border" role="status" className="mb-3 text-primary" style={{ width: '3rem', height: '3rem' }}>
                         <span className="visually-hidden">Cargando productos...</span>
                     </Spinner>
-                    <p className="text-muted">Cargando ofertas, por favor espera...</p>
+                    <p className="text-muted">Cargando productos, por favor espera...</p>
                 </div>
             ) : (
                 <>
-                    {saleProducts.length > 0 ? (
-                        renderProductCards(saleProducts)
-                    ) : (
+                    {pointsProducts.length > 0 && (
+                        <>
+                            {renderProductCards(pointsProducts)}
+                        </>
+                    )}
+
+                    {pointsProducts.length === 0 && (
                         <Alert variant="info" className="text-center my-5 d-flex flex-column align-items-center justify-content-center" style={{ minHeight: '300px' }}>
-                            <p className="mb-3 fs-5">¡Ups! Parece que no hay ofertas disponibles en este momento.</p>
+                            <p className="mb-3 fs-5">¡Ups! Parece que no hay productos de canje disponibles en este momento.</p>
                             {user && user.role === 'admin' && (
                                 <Button variant="primary" onClick={handleAddProductClick}>
-                                    Sé el primero en añadir una oferta
+                                    Sé el primero en añadir un producto
                                 </Button>
                             )}
                         </Alert>
@@ -190,4 +190,4 @@ const ProductListPage = () => {
     );
 };
 
-export default ProductListPage;
+export default RedeemProductsPage;
