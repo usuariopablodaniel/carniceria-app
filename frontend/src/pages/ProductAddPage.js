@@ -101,11 +101,6 @@ const ProductAddPage = () => {
             setIsSubmitting(false);
             return;
         }
-        if (hasPriceInput && hasPointsInput) {
-            setError('No puede ingresar Precio y Puntos de Canje a la vez. Elija uno.');
-            setIsSubmitting(false);
-            return;
-        }
         if (hasPriceInput) {
             const parsedPrice = parseFloat(formData.precio);
             if (isNaN(parsedPrice) || parsedPrice <= 0) {
@@ -136,9 +131,9 @@ const ProductAddPage = () => {
 
         const dataToSend = new FormData();
         // CORRECCIÓN: Se limpian los campos de texto de caracteres invisibles antes de enviar.
-        // También se ha corregido la lógica para no enviar campos vacíos.
-        const cleanedNombre = formData.nombre.replace(/\u00A0/g, ' ');
-        const cleanedDescripcion = formData.descripcion.replace(/\u00A0/g, ' ');
+        // Se utiliza una expresión regular para asegurar que se elimine cualquier "espacio de no-separación".
+        const cleanedNombre = formData.nombre.replace(/\u00A0/g, ' ').trim();
+        const cleanedDescripcion = formData.descripcion.replace(/\u00A0/g, ' ').trim();
         
         dataToSend.append('nombre', cleanedNombre);
         dataToSend.append('descripcion', cleanedDescripcion);
