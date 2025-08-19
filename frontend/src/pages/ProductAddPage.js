@@ -65,15 +65,21 @@ const ProductAddPage = () => {
                 setImagePreviewUrl('');
             }
         } else {
+            // CORRECCIÓN DEFINITIVA: Limpiamos el valor en el origen
+            let cleanedValue = value;
+            if (typeof value === 'string') {
+                cleanedValue = value.replace(/\u00A0/g, ' ').trim();
+            }
+
             setFormData(prevData => {
                 const newData = {
                     ...prevData,
-                    [name]: type === 'checkbox' ? checked : value,
+                    [name]: type === 'checkbox' ? checked : cleanedValue,
                 };
                 // Lógica para asegurar que solo se ingrese precio O puntos de canje
-                if (name === 'precio' && value !== '' && newData.puntos_canje !== '') {
+                if (name === 'precio' && cleanedValue !== '' && newData.puntos_canje !== '') {
                     newData.puntos_canje = '';
-                } else if (name === 'puntos_canje' && value !== '' && newData.precio !== '') {
+                } else if (name === 'puntos_canje' && cleanedValue !== '' && newData.precio !== '') {
                     newData.precio = '';
                 }
                 return newData;
@@ -130,13 +136,8 @@ const ProductAddPage = () => {
         }
 
         const dataToSend = new FormData();
-        // CORRECCIÓN: Se limpian los campos de texto de caracteres invisibles antes de enviar.
-        // Se utiliza una expresión regular para asegurar que se elimine cualquier "espacio de no-separación".
-        const cleanedNombre = formData.nombre.replace(/\u00A0/g, ' ').trim();
-        const cleanedDescripcion = formData.descripcion.replace(/\u00A0/g, ' ').trim();
-        
-        dataToSend.append('nombre', cleanedNombre);
-        dataToSend.append('descripcion', cleanedDescripcion);
+        dataToSend.append('nombre', formData.nombre);
+        dataToSend.append('descripcion', formData.descripcion);
 
         if (hasPriceInput) {
             dataToSend.append('precio', parseFloat(formData.precio));
