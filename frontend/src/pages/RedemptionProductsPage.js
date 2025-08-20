@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Container, Row, Col, Card, Spinner, Alert, Button, Image } from 'react-bootstrap'; 
+import { Container, Spinner, Alert, Button } from 'react-bootstrap'; 
 import api from '../api/axios'; 
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import RedeemProductList from './RedeemProductList'; // <== AQUI ESTA LA MAGIA
 
 const RedemptionProductsPage = () => {
     const { user, isAuthenticated, loadingAuth } = useAuth();
@@ -11,19 +12,6 @@ const RedemptionProductsPage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [userPoints, setUserPoints] = useState(null);
-
-    const getFullImageUrl = useCallback((relativePath) => {
-        if (!relativePath) {
-            return null; 
-        }
-        const baseUrlWithoutApi = api.defaults.baseURL.replace('/api', '');
-
-        if (relativePath.startsWith('/api/images/')) {
-            return `${baseUrlWithoutApi}${relativePath}`; 
-        } else {
-            return `${api.defaults.baseURL}/images/${relativePath}`; 
-        }
-    }, []);
 
     const fetchUserPoints = useCallback(async () => {
         if (!isAuthenticated || !user || !user.id) {
@@ -66,43 +54,6 @@ const RedemptionProductsPage = () => {
 
     const handleAddProductClick = () => {
         navigate('/products/add');
-    };
-
-    const handleEditProductClick = (productId) => {
-        navigate(`/products/edit/${productId}`);
-    };
-
-    const handleDeleteProduct = async (productId) => {
-        if (window.confirm('¿Estás seguro de que quieres eliminar este producto de canje?')) {
-            try {
-                await api.delete(`/products/${productId}`); 
-                fetchRedemptionProducts();
-            } catch (err) {
-                console.error("Error al eliminar el producto de canje:", err);
-                setError("No se pudo eliminar el producto de canje. Intenta de nuevo.");
-            }
-        }
-    };
-
-    // <==== LÓGICA DE CANJEO MODIFICADA ====>
-    const handleRedeemClick = (product) => { // AHORA RECIBE EL OBJETO PRODUCTO COMPLETO
-        if (isAuthenticated && (user.role === 'user' || user.role === 'employee')) {
-            navigate('/dashboard', {
-                state: {
-                    canjeo: true, // Indicador de que venimos de la página de canjeo
-                    productToRedeem: product, // Pasamos el objeto del producto completo
-                    message: `¡Excelente! Muestra tu código QR al vendedor para canjear "${product.nombre}".`,
-                    variant: 'success'
-                }
-            });
-        } else if (!isAuthenticated) {
-            navigate('/login', {
-                state: {
-                    message: 'Inicia sesión para canjear puntos.',
-                    variant: 'warning'
-                }
-            });
-        }
     };
 
     if (loading) {
@@ -149,72 +100,9 @@ const RedemptionProductsPage = () => {
                     <Button variant="link" href="/login">Iniciar Sesión</Button>
                 </Alert>
             )}
-
-            {redemptionProducts.length === 0 ? (
-                <Alert variant="info" className="text-center">
-                    No hay productos disponibles para canje en este momento. ¡Vuelve pronto!
-                </Alert>
-            ) : (
-                <Row xs={1} md={2} lg={3} className="g-4">
-                    {redemptionProducts.map(product => (
-                        <Col key={product.id}>
-                            <Card className="h-100 shadow-sm rounded-lg">
-                                <Image
-                                    variant="top"
-                                    src={product.imagen_url ? getFullImageUrl(product.imagen_url) : 'https://placehold.co/400x200/cccccc/000000?text=Sin+Imagen'}
-                                    alt={product.nombre}
-                                    style={{ height: '200px', objectFit: 'cover' }}
-                                    loading="lazy" 
-                                    onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/400x200/cccccc/000000?text=Error+Carga+Imagen'; }}
-                                />
-                                <Card.Body className="d-flex flex-column">
-                                    <Card.Title className="text-truncate" title={product.nombre}>{product.nombre}</Card.Title>
-                                    <Card.Text className="text-muted small mb-2">
-                                        {product.descripcion || 'Sin descripción.'}
-                                    </Card.Text>
-                                    <div className="mt-auto">
-                                        <h5 className="text-success mb-2">
-                                            <i className="bi bi-star-fill me-1"></i>
-                                            {product.puntos_canje} Puntos
-                                        </h5>
-                                        {isAuthenticated && userPoints !== null && (
-                                            product.puntos_canje <= userPoints ? (
-                                                <Button
-                                                    variant="success"
-                                                    className="w-100"
-                                                    onClick={() => handleRedeemClick(product)} // <== CAMBIO AQUI: PASAMOS EL OBJETO PRODUCTO
-                                                >
-                                                    ¡Canjear Ahora!
-                                                </Button>
-                                            ) : (
-                                                <Button variant="outline-secondary" className="w-100" disabled>
-                                                    Puntos Insuficientes
-                                                </Button>
-                                            )
-                                        )}
-                                        {!isAuthenticated && (
-                                            <Button variant="outline-secondary" className="w-100" disabled>
-                                                Inicia Sesión para Canjear
-                                            </Button>
-                                        )}
-
-                                        {user && user.role === 'admin' && (
-                                            <div className="d-flex justify-content-between mt-3">
-                                                <Button variant="warning" size="sm" onClick={() => handleEditProductClick(product.id)} className="me-2 flex-grow-1">
-                                                    Editar
-                                                </Button>
-                                                <Button variant="danger" size="sm" onClick={() => handleDeleteProduct(product.id)} className="flex-grow-1">
-                                                    Eliminar
-                                                </Button>
-                                            </div>
-                                        )}
-                                    </div>
-                                </Card.Body>
-                            </Card>
-                        </Col>
-                    ))}
-                </Row>
-            )}
+            
+            {/* <== ELIMINAMOS EL MAPEO AQUÍ Y USAMOS EL COMPONENTE SEPARADO ==> */}
+            <RedeemProductList products={redemptionProducts} userPoints={userPoints} />
         </Container>
     );
 };
