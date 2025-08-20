@@ -6,12 +6,13 @@ const RedeemProductList = ({ products, userPoints }) => {
     const navigate = useNavigate();
 
     const handleRedeem = (product) => {
-        if (userPoints >= product.costo_puntos) {
+        // Usa la propiedad correcta: puntos_canje
+        if (userPoints >= product.puntos_canje) { 
             navigate('/dashboard', { 
                 state: { 
                     canjeo: true,
                     productToRedeem: product, 
-                    message: `Muestra el código QR al vendedor para canjear tu ${product.nombre}. Se debitarán ${product.costo_puntos} puntos.`,
+                    message: `Muestra el código QR al vendedor para canjear tu ${product.nombre}. Se debitarán ${product.puntos_canje} puntos.`, // Usa puntos_canje
                     variant: 'success'
                 } 
             });
@@ -31,8 +32,8 @@ const RedeemProductList = ({ products, userPoints }) => {
                                     {product.descripcion}
                                 </Card.Text>
                                 <div className="text-center mt-auto">
-                                    <h4 className="text-primary mb-3">{product.costo_puntos} puntos</h4>
-                                    {userPoints !== null && userPoints < product.costo_puntos ? (
+                                    <h4 className="text-primary mb-3">{product.puntos_canje} puntos</h4> {/* Usa puntos_canje */}
+                                    {userPoints !== null && userPoints < product.puntos_canje ? ( // Usa puntos_canje
                                         <Button variant="outline-secondary" disabled>
                                             Puntos Insuficientes
                                         </Button>
