@@ -3,7 +3,7 @@ import { Container, Row, Col, Card, Spinner, Alert, Button } from 'react-bootstr
 import api from '../api/axios'; 
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import './RedemptionProductsPage.css';
+
 
 const RedemptionProductsPage = () => {
     const { user, isAuthenticated, loadingAuth } = useAuth();
