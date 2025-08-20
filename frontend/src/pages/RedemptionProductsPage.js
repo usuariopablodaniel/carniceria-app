@@ -18,7 +18,7 @@ const RedemptionProductsPage = () => {
             return 'https://placehold.co/400x200/cccccc/000000?text=Error+Carga+Imagen';
         }
         const baseUrl = import.meta.env.VITE_API_URL;
-        // Corrección: Agregar la ruta al endpoint de imágenes
+        // Corrección: Agregamos la ruta del endpoint que sirve las imágenes.
         return `${baseUrl}/api/images/${relativePath}`;
     }, []);
 
