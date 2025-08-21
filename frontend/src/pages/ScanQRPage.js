@@ -54,8 +54,81 @@ const ScanQRPage = () => {
         fetchRedemptionProducts();
     }, []);
 
-    const handleRegisterRedemption = useCallback(async (e) => {
-        if (e) e.preventDefault();
+    const onNewScanResult = useCallback(async (decodedText, decodedResult) => {
+        setScannerActive(false); 
+        setMessage('');
+        setError('');
+        setRedemptionError('');
+        setScannedUserName('');
+        setAmount('');
+        setSelectedRedemptionProduct('');
+        setSelectedRedemptionPoints(0);
+
+        setScannedUserId(decodedText);
+
+        try {
+            const response = await axios.get(`/auth/user/${decodedText}`); 
+            if (response.data && response.data.user) {
+                setScannedUserName(response.data.user.nombre || response.data.user.name || `ID: ${decodedText}`);
+            } else {
+                setScannedUserName(`ID: ${decodedText}`);
+            }
+        } catch (fetchUserError) {
+            console.error('ScanQRPage: Error al obtener nombre de usuario escaneado:', fetchUserError.response ? fetchUserError.response.data : fetchUserError.message);
+            setScannedUserName(`ID: ${decodedText} (Error al cargar nombre)`);
+        }
+
+        if (amountInputRef.current) {
+            amountInputRef.current.focus();
+        }
+    }, [setScannerActive, setScannedUserId, setScannedUserName, setMessage, setError, setRedemptionError, setAmount, setSelectedRedemptionProduct, setSelectedRedemptionPoints, amountInputRef]);
+
+    const handleRegisterPurchase = async (e) => {
+        e.preventDefault();
+        setMessage('');
+        setError('');
+        setIsProcessingPurchase(true);
+
+        if (!scannedUserId) {
+            setError('Por favor, escanea un código QR de usuario primero.');
+            setIsProcessingPurchase(false);
+            return;
+        }
+        if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+            setError('Por favor, ingresa un monto de compra válido y positivo.');
+            setIsProcessingPurchase(false);
+            return;
+        }
+        try {
+            const response = await axios.post('/transactions/purchase', {
+                userId: scannedUserId,
+                amount: parseFloat(amount)
+            });
+            if (response.status === 200) {
+                setMessage(response.data.message + ` Nuevos puntos: ${response.data.newPoints}`);
+                setAmount('');
+                setScannedUserId(null); 
+                setScannedUserName('');
+            } else {
+                setError(response.data.error || 'Error desconocido al registrar la compra.');
+            }
+        } catch (err) {
+            console.error('ScanQRPage: Error en la solicitud de registro de compra:', err.response ? err.response.data : err.message);
+            if (err.response) {
+                setError(err.response.data.error || 'No se pudo registrar la compra.');
+            } else {
+                setError('Error de conexión o del servidor al registrar la compra.');
+            }
+        } finally {
+            setIsProcessingPurchase(false);
+            setTimeout(() => {
+                setScannerActive(true); 
+            }, 500);
+        }
+    };
+
+    const handleRegisterRedemption = async (e) => {
+        e.preventDefault();
         setMessage('');
         setError('');
         setRedemptionError('');
@@ -95,81 +168,6 @@ const ScanQRPage = () => {
             }
         } finally {
             setIsProcessingRedemption(false);
-            setTimeout(() => {
-                setScannerActive(true); 
-            }, 500);
-        }
-    }, [scannedUserId, selectedRedemptionProduct, selectedRedemptionPoints, setMessage, setError, setRedemptionError, setIsProcessingRedemption, setScannedUserId, setScannedUserName, setSelectedRedemptionProduct, setSelectedRedemptionPoints, setScannerActive]);
-
-
-    const onNewScanResult = useCallback(async (decodedText) => {
-        setScannerActive(false); 
-        setMessage('');
-        setError('');
-        setRedemptionError('');
-        setScannedUserName('');
-        setAmount('');
-
-        let scannedUserId = decodedText;
-        setScannedUserId(scannedUserId);
-
-        if (scannedUserId) {
-            try {
-                const response = await axios.get(`/auth/user/${scannedUserId}`); 
-                if (response.data && response.data.user) {
-                    setScannedUserName(response.data.user.nombre || response.data.user.name || `ID: ${scannedUserId}`);
-                } else {
-                    setScannedUserName(`ID: ${scannedUserId}`);
-                }
-            } catch (fetchUserError) {
-                console.error('ScanQRPage: Error al obtener nombre de usuario escaneado:', fetchUserError.response ? fetchUserError.response.data : fetchUserError.message);
-                setScannedUserName(`ID: ${scannedUserId} (Error al cargar nombre)`);
-            }
-        }
-
-        if (amountInputRef.current) {
-            amountInputRef.current.focus();
-        }
-
-    }, []);
-
-    const handleRegisterPurchase = async (e) => {
-        e.preventDefault();
-        setMessage('');
-        setError('');
-        setIsProcessingPurchase(true);
-        if (!scannedUserId) {
-            setError('Por favor, escanea un código QR de usuario primero.');
-            setIsProcessingPurchase(false);
-            return;
-        }
-        if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
-            setError('Por favor, ingresa un monto de compra válido y positivo.');
-            setIsProcessingPurchase(false);
-            return;
-        }
-        try {
-            const response = await axios.post('/transactions/purchase', {
-                userId: scannedUserId,
-                amount: parseFloat(amount)
-            });
-            if (response.status === 200) {
-                setMessage(response.data.message + ` Nuevos puntos: ${response.data.newPoints}`);
-                setAmount('');
-                setScannedUserId(null); 
-                setScannedUserName('');
-            } else {
-                setError(response.data.error || 'Error desconocido al registrar la compra.');
-            }
-        } catch (err) {
-            console.error('ScanQRPage: Error en la solicitud de registro de compra:', err.response ? err.response.data : err.message);
-            if (err.response) {
-                setError(err.response.data.error || 'No se pudo registrar la compra.');
-            } else {
-                setError('Error de conexión o del servidor al registrar la compra.');
-            }
-        } finally {
-            setIsProcessingPurchase(false);
             setTimeout(() => {
                 setScannerActive(true); 
             }, 500);
@@ -228,7 +226,7 @@ const ScanQRPage = () => {
                                 qrbox={250}
                                 disableFlip={false}
                                 qrCodeSuccessCallback={onNewScanResult}
-                                verbose={false} 
+                                verbose={false}
                             />
                         ) : (
                             <div className="text-center py-5">
@@ -249,7 +247,7 @@ const ScanQRPage = () => {
                 </Col>
                 <Col md={6}>
                     <Card className="p-3 h-100">
-                        <Card.Title className="text-center mb-3">Registrar Transacción</Card.Title>
+                        <Card.Title className="text-center mb-3">Registrar Compra</Card.Title>
                         <Form onSubmit={handleRegisterPurchase}>
                             <Form.Group className="mb-3">
                                 <Form.Label>Usuario Escaneado:</Form.Label>
@@ -271,10 +269,11 @@ const ScanQRPage = () => {
                                     onChange={(e) => setAmount(e.target.value)}
                                     disabled={!scannedUserId || isProcessingPurchase}
                                     ref={amountInputRef}
+                                    required
                                 />
                             </Form.Group>
                             <Button 
-                                variant="primary"
+                                variant="success"
                                 type="submit" 
                                 className="w-100" 
                                 disabled={!scannedUserId || isProcessingPurchase}
@@ -282,43 +281,70 @@ const ScanQRPage = () => {
                                 {isProcessingPurchase ? (
                                     <>
                                         <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
-                                        Procesando Compra...
+                                        Procesando...
                                     </>
                                 ) : (
-                                    'Registrar Compra'
+                                    'Registrar Compra y Asignar Puntos'
                                 )}
                             </Button>
                         </Form>
+                    </Card>
+                </Col>
+            </Row>
 
-                        <h5 className="text-center text-muted my-3">ó</h5>
-
+            <Row className="mt-4">
+                <Col>
+                    <Card className="p-3">
+                        <Card.Title className="text-center mb-3">Canjear Puntos</Card.Title>
                         <Form onSubmit={handleRegisterRedemption}>
-                            <Form.Group className="mb-3" controlId="formRedemptionProduct">
-                                <Form.Label>Canjear Producto</Form.Label>
-                                <Form.Control
-                                    as="select"
-                                    value={selectedRedemptionProduct}
-                                    onChange={handleProductSelectChange}
-                                    disabled={!scannedUserId || loadingRedemptionProducts || isProcessingRedemption}
-                                    required
-                                >
-                                    <option value="">Selecciona un producto...</option>
-                                    {redemptionProducts.map(p => (
-                                        <option key={p.id} value={p.id}>{p.nombre} ({p.puntos_canje} puntos)</option>
-                                    ))}
-                                </Form.Control>
-                            </Form.Group>
                             <Form.Group className="mb-3">
-                                <Form.Label>Puntos a Descontar</Form.Label>
-                                <Form.Control
-                                    type="number"
-                                    value={selectedRedemptionPoints}
-                                    readOnly
+                                <Form.Label>Usuario Escaneado:</Form.Label>
+                                <Form.Control 
+                                    type="text" 
+                                    value={scannedUserName || (scannedUserId ? `ID: ${scannedUserId}` : 'Esperando QR...')} 
+                                    readOnly 
+                                    disabled={!scannedUserId}
+                                />
+                            </Form.Group>
+
+                            <Form.Group className="mb-3" controlId="formRedeemProduct">
+                                <Form.Label>Producto a Canjear</Form.Label>
+                                {loadingRedemptionProducts ? (
+                                    <div className="d-flex align-items-center">
+                                        <Spinner animation="border" size="sm" className="me-2" />
+                                        <span>Cargando productos...</span>
+                                    </div>
+                                ) : redemptionError ? (
+                                    <Alert variant="danger" className="py-2">{redemptionError}</Alert>
+                                ) : (
+                                    <Form.Select 
+                                        value={selectedRedemptionProduct} 
+                                        onChange={handleProductSelectChange}
+                                        disabled={!scannedUserId || isProcessingRedemption || redemptionProducts.length === 0}
+                                        required
+                                    >
+                                        <option value="">Selecciona un producto</option>
+                                        {redemptionProducts.map(product => (
+                                            <option key={product.id} value={product.id}>
+                                                {product.nombre} ({product.puntos_canje} puntos)
+                                            </option>
+                                        ))}
+                                    </Form.Select>
+                                )}
+                            </Form.Group>
+
+                            <Form.Group className="mb-3">
+                                <Form.Label>Puntos Necesarios:</Form.Label>
+                                <Form.Control 
+                                    type="text" 
+                                    value={selectedRedemptionPoints > 0 ? selectedRedemptionPoints : 'Selecciona un producto'} 
+                                    readOnly 
                                     disabled={true}
                                 />
                             </Form.Group>
+
                             <Button 
-                                variant="success"
+                                variant="warning" 
                                 type="submit" 
                                 className="w-100" 
                                 disabled={!scannedUserId || !selectedRedemptionProduct || isProcessingRedemption}
@@ -329,7 +355,7 @@ const ScanQRPage = () => {
                                         Procesando Canje...
                                     </>
                                 ) : (
-                                    'Registrar Canje'
+                                    'Canjear Puntos'
                                 )}
                             </Button>
                         </Form>
