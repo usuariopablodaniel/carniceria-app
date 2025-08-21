@@ -17,8 +17,8 @@ const ScanQRPage = () => {
     const [isProcessingPurchase, setIsProcessingPurchase] = useState(false);
     const [isProcessingRedemption, setIsProcessingRedemption] = useState(false);
     const [scannedUserName, setScannedUserName] = useState('');
-
-    // Controla si el componente Html5QrcodePlugin debe montarse/desmontarse
+    const [isRedemptionScan, setIsRedemptionScan] = useState(false);
+    
     const [scannerActive, setScannerActive] = useState(true); 
 
     const [redemptionProducts, setRedemptionProducts] = useState([]);
@@ -29,28 +29,21 @@ const ScanQRPage = () => {
 
     const amountInputRef = useRef(null);
 
-    // Redirección si no es admin (o empleado si lo añades)
     useEffect(() => {
         if (loadingAuth) return;
         if (!isAuthenticated || (user && user.role !== 'admin' && user.role !== 'employee')) {
-            // console.log("ScanQRPage: Redirigiendo - Usuario no autorizado o no autenticado."); // Eliminado
             navigate('/dashboard', { replace: true });
-        } else {
-            // console.log("ScanQRPage: Usuario autorizado. Rol:", user.role); // Eliminado
         }
     }, [user, isAuthenticated, loadingAuth, navigate]);
 
-    // useEffect para cargar productos de canje
     useEffect(() => {
         const fetchRedemptionProducts = async () => {
             setLoadingRedemptionProducts(true);
             setRedemptionError('');
             try {
-                // console.log("ScanQRPage: Cargando productos de canje..."); // Eliminado
                 const response = await axios.get('/products');
                 const redeemable = response.data.filter(p => p.puntos_canje !== null && p.puntos_canje > 0);
                 setRedemptionProducts(redeemable);
-                // console.log("ScanQRPage: Productos de canje cargados:", redeemable); // Eliminado
             } catch (err) {
                 console.error('ScanQRPage: Error al cargar productos de canje:', err);
                 setRedemptionError('No se pudieron cargar los productos de canje.');
@@ -62,134 +55,42 @@ const ScanQRPage = () => {
         fetchRedemptionProducts();
     }, []);
 
-    // Función que se llama cuando se escanea un QR, memoizada con useCallback
-    const onNewScanResult = useCallback(async (decodedText, decodedResult) => {
-        // console.log(`ScanQRPage: QR Code scanned = ${decodedText}`); // Eliminado
-        // Desmontar el escáner inmediatamente
-        setScannerActive(false); 
-        // console.log("ScanQRPage: Escáner pausado (componente desmontado)."); // Eliminado
-
-        setMessage('');
-        setError('');
-        setRedemptionError('');
-        setScannedUserName('');
-        setAmount('');
-        setSelectedRedemptionProduct('');
-        setSelectedRedemptionPoints(0);
-
-        setScannedUserId(decodedText);
-
-        // Intentar obtener el nombre del usuario escaneado
-        try {
-            // console.log(`ScanQRPage: Intentando obtener nombre para userId: ${decodedText}`); // Eliminado
-            const response = await axios.get(`/auth/user/${decodedText}`); 
-            // console.log("ScanQRPage: Respuesta de /auth/user/:id:", response.data); // Eliminado
-            if (response.data && response.data.user) {
-                setScannedUserName(response.data.user.nombre || response.data.user.name || `ID: ${decodedText}`);
-                // console.log("ScanQRPage: Nombre de usuario escaneado:", response.data.user.nombre || response.data.user.name); // Eliminado
-            } else {
-                setScannedUserName(`ID: ${decodedText}`);
-                // console.log("ScanQRPage: No se encontró nombre en la respuesta, mostrando solo ID."); // Eliminado
-            }
-        } catch (fetchUserError) {
-            console.error('ScanQRPage: Error al obtener nombre de usuario escaneado:', fetchUserError.response ? fetchUserError.response.data : fetchUserError.message);
-            setScannedUserName(`ID: ${decodedText} (Error al cargar nombre)`);
-        }
-
-        if (amountInputRef.current) {
-            amountInputRef.current.focus();
-        }
-    }, [setScannerActive, setScannedUserId, setScannedUserName, setMessage, setError, setRedemptionError, setAmount, setSelectedRedemptionProduct, setSelectedRedemptionPoints, amountInputRef]);
-
-    const handleRegisterPurchase = async (e) => {
-        e.preventDefault();
-        setMessage('');
-        setError('');
-        setIsProcessingPurchase(true);
-        // console.log("ScanQRPage: Iniciando registro de compra."); // Eliminado
-
-        if (!scannedUserId) {
-            setError('Por favor, escanea un código QR de usuario primero.');
-            setIsProcessingPurchase(false);
-            return;
-        }
-        if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
-            setError('Por favor, ingresa un monto de compra válido y positivo.');
-            setIsProcessingPurchase(false);
-            return;
-        }
-
-        try {
-            // console.log(`ScanQRPage: Enviando compra para userId: ${scannedUserId}, monto: ${parseFloat(amount)}`); // Eliminado
-            const response = await axios.post('/transactions/purchase', {
-                userId: scannedUserId,
-                amount: parseFloat(amount)
-            });
-
-            if (response.status === 200) {
-                setMessage(response.data.message + ` Nuevos puntos: ${response.data.newPoints}`);
-                setAmount('');
-                setScannedUserId(null); 
-                setScannedUserName('');
-                // console.log("ScanQRPage: Compra registrada con éxito."); // Eliminado
-            } else {
-                setError(response.data.error || 'Error desconocido al registrar la compra.');
-                console.error("ScanQRPage: Error al registrar compra (respuesta no 200):", response.data);
-            }
-        } catch (err) {
-            console.error('ScanQRPage: Error en la solicitud de registro de compra:', err.response ? err.response.data : err.message);
-            if (err.response) {
-                setError(err.response.data.error || 'No se pudo registrar la compra.');
-            } else {
-                setError('Error de conexión o del servidor al registrar la compra.');
-            }
-        } finally {
-            setIsProcessingPurchase(false);
-            // Introduce un pequeño retraso antes de volver a montar el escáner
-            setTimeout(() => {
-                setScannerActive(true); 
-                // console.log("ScanQRPage: Proceso de compra finalizado. Escáner reactivado después de retraso."); // Eliminado
-            }, 500); // 500ms de retraso
-        }
-    };
-
-    const handleRegisterRedemption = async (e) => {
-        e.preventDefault();
+    const handleRegisterRedemption = useCallback(async (e, userIdFromScan = null, productIdFromScan = null, pointsFromScan = null) => {
+        if (e) e.preventDefault();
         setMessage('');
         setError('');
         setRedemptionError('');
         setIsProcessingRedemption(true);
-        // console.log("ScanQRPage: Iniciando registro de canje."); // Eliminado
 
-        if (!scannedUserId) {
+        const currentUserId = userIdFromScan || scannedUserId;
+        const currentProductId = productIdFromScan || selectedRedemptionProduct;
+        const currentPoints = pointsFromScan || selectedRedemptionPoints;
+
+        if (!currentUserId) {
             setRedemptionError('Por favor, escanea un código QR de usuario primero.');
             setIsProcessingRedemption(false);
             return;
         }
-        if (!selectedRedemptionProduct || selectedRedemptionPoints <= 0) {
+        if (!currentProductId || currentPoints <= 0) {
             setRedemptionError('Por favor, selecciona un producto de canje válido.');
             setIsProcessingRedemption(false);
             return;
         }
-
         try {
-            // console.log(`ScanQRPage: Enviando canje para userId: ${scannedUserId}, puntos: ${selectedRedemptionPoints}, productId: ${selectedRedemptionProduct}`); // Eliminado
             const response = await axios.post('/transactions/redeem', {
-                userId: scannedUserId,
-                pointsToRedeem: selectedRedemptionPoints,
-                productId: selectedRedemptionProduct
+                userId: currentUserId,
+                pointsToRedeem: currentPoints,
+                productId: currentProductId
             });
-
             if (response.status === 200) {
                 setMessage(response.data.message + ` Puntos restantes: ${response.data.newPoints}`);
                 setSelectedRedemptionProduct('');
                 setSelectedRedemptionPoints(0);
                 setScannedUserId(null); 
                 setScannedUserName('');
-                // console.log("ScanQRPage: Canje registrado con éxito."); // Eliminado
+                setIsRedemptionScan(false);
             } else {
                 setRedemptionError(response.data.error || 'Error desconocido al registrar el canje.');
-                console.error("ScanQRPage: Error al registrar canje (respuesta no 200):", response.data);
             }
         } catch (err) {
             console.error('ScanQRPage: Error en la solicitud de registro de canje:', err.response ? err.response.data : err.message);
@@ -200,11 +101,112 @@ const ScanQRPage = () => {
             }
         } finally {
             setIsProcessingRedemption(false);
-            // Introduce un pequeño retraso antes de volver a montar el escáner
             setTimeout(() => {
                 setScannerActive(true); 
-                // console.log("ScanQRPage: Proceso de canje finalizado. Escáner reactivado después de retraso."); // Eliminado
-            }, 500); // 500ms de retraso
+            }, 500);
+        }
+    }, [scannedUserId, selectedRedemptionProduct, selectedRedemptionPoints, setMessage, setError, setRedemptionError, setIsProcessingRedemption, setScannedUserId, setScannedUserName, setIsRedemptionScan, setSelectedRedemptionProduct, setSelectedRedemptionPoints, setScannerActive]);
+
+    const onNewScanResult = useCallback(async (decodedText, decodedResult) => {
+        setScannerActive(false); 
+        setMessage('');
+        setError('');
+        setRedemptionError('');
+        setScannedUserName('');
+        setAmount('');
+        
+        let scannedUserId = null;
+        let isRedemption = false;
+        let selectedProduct = null;
+
+        try {
+            const data = JSON.parse(decodedText);
+            if (data.userId && data.productId) {
+                scannedUserId = data.userId.toString();
+                const product = redemptionProducts.find(p => p.id === data.productId);
+                if (product) {
+                    isRedemption = true;
+                    selectedProduct = product;
+                    setSelectedRedemptionProduct(product.id.toString());
+                    setSelectedRedemptionPoints(product.puntos_canje);
+                    setMessage(`Producto de canje detectado: ${product.nombre}`);
+                } else {
+                    setError('Producto de canje no encontrado. Escanea un QR de usuario normal.');
+                }
+            } else {
+                scannedUserId = decodedText;
+            }
+        } catch (e) {
+            scannedUserId = decodedText;
+        }
+
+        setScannedUserId(scannedUserId);
+        setIsRedemptionScan(isRedemption);
+
+        if (scannedUserId) {
+            try {
+                const response = await axios.get(`/auth/user/${scannedUserId}`); 
+                if (response.data && response.data.user) {
+                    setScannedUserName(response.data.user.nombre || response.data.user.name || `ID: ${scannedUserId}`);
+                } else {
+                    setScannedUserName(`ID: ${scannedUserId}`);
+                }
+            } catch (fetchUserError) {
+                console.error('ScanQRPage: Error al obtener nombre de usuario escaneado:', fetchUserError.response ? fetchUserError.response.data : fetchUserError.message);
+                setScannedUserName(`ID: ${scannedUserId} (Error al cargar nombre)`);
+            }
+        }
+
+        if (amountInputRef.current) {
+            amountInputRef.current.focus();
+        }
+
+        if (isRedemption && selectedProduct) {
+            handleRegisterRedemption(null, scannedUserId, selectedProduct.id, selectedProduct.puntos_canje);
+        }
+    }, [redemptionProducts, handleRegisterRedemption]);
+
+    const handleRegisterPurchase = async (e) => {
+        e.preventDefault();
+        setMessage('');
+        setError('');
+        setIsProcessingPurchase(true);
+        if (!scannedUserId) {
+            setError('Por favor, escanea un código QR de usuario primero.');
+            setIsProcessingPurchase(false);
+            return;
+        }
+        if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+            setError('Por favor, ingresa un monto de compra válido y positivo.');
+            setIsProcessingPurchase(false);
+            return;
+        }
+        try {
+            const response = await axios.post('/transactions/purchase', {
+                userId: scannedUserId,
+                amount: parseFloat(amount)
+            });
+            if (response.status === 200) {
+                setMessage(response.data.message + ` Nuevos puntos: ${response.data.newPoints}`);
+                setAmount('');
+                setScannedUserId(null); 
+                setScannedUserName('');
+                setIsRedemptionScan(false);
+            } else {
+                setError(response.data.error || 'Error desconocido al registrar la compra.');
+            }
+        } catch (err) {
+            console.error('ScanQRPage: Error en la solicitud de registro de compra:', err.response ? err.response.data : err.message);
+            if (err.response) {
+                setError(err.response.data.error || 'No se pudo registrar la compra.');
+            } else {
+                setError('Error de conexión o del servidor al registrar la compra.');
+            }
+        } finally {
+            setIsProcessingPurchase(false);
+            setTimeout(() => {
+                setScannerActive(true); 
+            }, 500);
         }
     };
 
@@ -229,9 +231,8 @@ const ScanQRPage = () => {
         setMessage('');
         setError('');
         setRedemptionError('');
-        // console.log("ScanQRPage: Botón 'Activar Escáner' presionado. Escáner reactivado y campos limpiados."); // Eliminado
+        setIsRedemptionScan(false);
     };
-
 
     if (loadingAuth || !isAuthenticated || (user && user.role !== 'admin' && user.role !== 'employee')) {
         return (
@@ -256,19 +257,17 @@ const ScanQRPage = () => {
                 <Col md={6}>
                     <Card className="p-3 h-100">
                         <Card.Title className="text-center mb-3">Lector de QR</Card.Title>
-                        {/* Renderizar Html5QrcodePlugin solo cuando scannerActive es true */}
                         {scannerActive ? (
                             <Html5QrcodePlugin 
                                 fps={10}
                                 qrbox={250}
                                 disableFlip={false}
                                 qrCodeSuccessCallback={onNewScanResult}
-                                verbose={false} // Puedes cambiar a true para más logs de la librería
+                                verbose={false} 
                             />
                         ) : (
                             <div className="text-center py-5">
-                                {/* Mensaje cuando el escáner está pausado */}
-                                <Spinner animation="border" className="mb-3" />
+                                <Spinner as="span" animation="border" className="mb-3" />
                                 <p>QR escaneado. Procesando transacción...</p>
                                 <Button variant="outline-primary" onClick={activateScanner} className="mt-3">
                                     Activar Escáner para Nueva Transacción
@@ -285,8 +284,10 @@ const ScanQRPage = () => {
                 </Col>
                 <Col md={6}>
                     <Card className="p-3 h-100">
-                        <Card.Title className="text-center mb-3">Registrar Compra</Card.Title>
-                        <Form onSubmit={handleRegisterPurchase}>
+                        <Card.Title className="text-center mb-3">
+                            {isRedemptionScan ? 'Confirmar Canje' : 'Registrar Transacción'}
+                        </Card.Title>
+                        <Form onSubmit={isRedemptionScan ? handleRegisterRedemption : handleRegisterPurchase}>
                             <Form.Group className="mb-3">
                                 <Form.Label>Usuario Escaneado:</Form.Label>
                                 <Form.Control 
@@ -296,103 +297,94 @@ const ScanQRPage = () => {
                                     disabled={!scannedUserId}
                                 />
                             </Form.Group>
-                            <Form.Group className="mb-3" controlId="formAmount">
-                                <Form.Label>Monto de la Compra ($ARS)</Form.Label>
-                                <Form.Control
-                                    type="number"
-                                    placeholder="Ej: 15000.50"
-                                    step="0.01"
-                                    value={amount}
-                                    onChange={(e) => setAmount(e.target.value)}
-                                    disabled={!scannedUserId || isProcessingPurchase}
-                                    ref={amountInputRef}
-                                    required
-                                />
-                            </Form.Group>
+                            
+                            {isRedemptionScan ? (
+                                <>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Producto a Canjear</Form.Label>
+                                        <Form.Control 
+                                            type="text"
+                                            value={redemptionProducts.find(p => p.id.toString() === selectedRedemptionProduct)?.nombre || ''}
+                                            readOnly
+                                            disabled={true}
+                                        />
+                                    </Form.Group>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Puntos a Descontar</Form.Label>
+                                        <Form.Control
+                                            type="number"
+                                            value={selectedRedemptionPoints}
+                                            readOnly
+                                            disabled={true}
+                                        />
+                                    </Form.Group>
+                                </>
+                            ) : (
+                                <>
+                                    <Form.Group className="mb-3" controlId="formAmount">
+                                        <Form.Label>Monto de la Compra ($ARS)</Form.Label>
+                                        <Form.Control
+                                            type="number"
+                                            placeholder="Ej: 15000.50"
+                                            step="0.01"
+                                            value={amount}
+                                            onChange={(e) => setAmount(e.target.value)}
+                                            disabled={!scannedUserId || isProcessingPurchase}
+                                            ref={amountInputRef}
+                                            required
+                                        />
+                                    </Form.Group>
+                                    <h5 className="text-center text-muted my-3">ó</h5>
+                                    <Form.Group className="mb-3" controlId="formRedemptionProduct">
+                                        <Form.Label>Canjear Producto (Selección Manual)</Form.Label>
+                                        <Form.Control
+                                            as="select"
+                                            value={selectedRedemptionProduct}
+                                            onChange={handleProductSelectChange}
+                                            disabled={!scannedUserId || loadingRedemptionProducts || isProcessingRedemption}
+                                            required={scannedUserId && !isRedemptionScan}
+                                        >
+                                            <option value="">Selecciona un producto...</option>
+                                            {redemptionProducts.map(p => (
+                                                <option key={p.id} value={p.id}>{p.nombre} ({p.puntos_canje} puntos)</option>
+                                            ))}
+                                        </Form.Control>
+                                    </Form.Group>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Puntos de Canje</Form.Label>
+                                        <Form.Control
+                                            type="number"
+                                            value={selectedRedemptionPoints}
+                                            readOnly
+                                            disabled={true}
+                                        />
+                                    </Form.Group>
+                                </>
+                            )}
                             <Button 
-                                variant="success" 
+                                variant={isRedemptionScan ? "success" : "primary"}
                                 type="submit" 
                                 className="w-100" 
-                                disabled={!scannedUserId || isProcessingPurchase}
+                                disabled={isRedemptionScan ? isProcessingRedemption : isProcessingPurchase}
                             >
-                                {isProcessingPurchase ? (
-                                    <>
-                                        <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
-                                        Procesando...
-                                    </>
+                                {isRedemptionScan ? (
+                                    isProcessingRedemption ? (
+                                        <>
+                                            <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
+                                            Procesando Canje...
+                                        </>
+                                    ) : (
+                                        'Confirmar Canje'
+                                    )
                                 ) : (
-                                    'Registrar Compra y Asignar Puntos'
-                                )}
-                            </Button>
-                        </Form>
-                    </Card>
-                </Col>
-            </Row>
-
-            <Row className="mt-4">
-                <Col>
-                    <Card className="p-3">
-                        <Card.Title className="text-center mb-3">Canjear Puntos</Card.Title>
-                        <Form onSubmit={handleRegisterRedemption}>
-                            <Form.Group className="mb-3">
-                                <Form.Label>Usuario Escaneado:</Form.Label>
-                                <Form.Control 
-                                    type="text" 
-                                    value={scannedUserName || (scannedUserId ? `ID: ${scannedUserId}` : 'Esperando QR...')} 
-                                    readOnly 
-                                    disabled={!scannedUserId}
-                                />
-                            </Form.Group>
-
-                            <Form.Group className="mb-3" controlId="formRedeemProduct">
-                                <Form.Label>Producto a Canjear</Form.Label>
-                                {loadingRedemptionProducts ? (
-                                    <div className="d-flex align-items-center">
-                                        <Spinner animation="border" size="sm" className="me-2" />
-                                        <span>Cargando productos...</span>
-                                    </div>
-                                ) : redemptionError ? (
-                                    <Alert variant="danger" className="py-2">{redemptionError}</Alert>
-                                ) : (
-                                    <Form.Select 
-                                        value={selectedRedemptionProduct} 
-                                        onChange={handleProductSelectChange}
-                                        disabled={!scannedUserId || isProcessingRedemption || redemptionProducts.length === 0}
-                                        required
-                                    >
-                                        <option value="">Selecciona un producto</option>
-                                        {redemptionProducts.map(product => (
-                                            <option key={product.id} value={product.id}>
-                                                {product.nombre} ({product.puntos_canje} puntos)
-                                            </option>
-                                        ))}
-                                    </Form.Select>
-                                )}
-                            </Form.Group>
-
-                            <Form.Group className="mb-3">
-                                <Form.Label>Puntos Necesarios:</Form.Label>
-                                <Form.Control 
-                                    type="text" 
-                                    value={selectedRedemptionPoints > 0 ? selectedRedemptionPoints : 'Selecciona un producto'} 
-                                    readOnly 
-                                    disabled={true}
-                                />
-                            </Form.Group>
-
-                            <Button 
-                                variant="warning" 
-                                type="submit" 
-                                className="w-100" 
-                                disabled={!scannedUserId || !selectedRedemptionProduct || isProcessingRedemption}
-                            >
-                                {isProcessingRedemption ? (
-                                    <>
-                                        <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
-                                        Procesando Canje...
-                                    </>
-                                ) : (
-                                    'Canjear Puntos'
+                                    isProcessingPurchase ? (
+                                        <>
+                                            <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
+                                            Procesando Compra...
+                                        </>
+                                    ) : (
+                                        'Registrar Transacción'
+                                    )
                                 )}
                             </Button>
                         </Form>
