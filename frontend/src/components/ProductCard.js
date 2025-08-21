@@ -2,17 +2,14 @@ import React from 'react';
 import { Card, Button, Badge, Alert, Spinner } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import api from '../api/axios'; // Usar la instancia 'api' de axios
+import api from '../api/axios';
 
-// Añadimos 'onProductDeleted' como prop, para que el componente padre (ProductListPage)
-// sepa cuándo un producto ha sido eliminado y pueda recargar la lista.
-const ProductCard = ({ product, onProductDeleted }) => {
+const ProductCard = ({ product, onProductDeleted, userPoints, onRedeemClick }) => {
     const navigate = useNavigate();
     const { isAuthenticated, user } = useAuth();
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState(null);
 
-    // Función para formatear el precio a moneda argentina (ARS)
     const formatPrice = (price) => {
         return new Intl.NumberFormat('es-AR', {
             style: 'currency',
@@ -21,33 +18,12 @@ const ProductCard = ({ product, onProductDeleted }) => {
         }).format(price);
     };
 
-    // >>>>>>>>>>>>>>> LÓGICA DE IMAGEN: Simplificada <<<<<<<<<<<<<<<<
-    // Este componente recibe la URL completa de la imagen desde el padre (ProductListPage o RedemptionProductsPage).
-    // Por lo tanto, solo necesita manejar el caso de que la URL sea nula/vacía o si la carga falla.
-    const getImageUrl = (url) => {
-        if (!url || url.trim() === '') {
-            // Placeholder si no hay URL de imagen
-            return 'https://placehold.co/400x200/cccccc/000000?text=Sin+Imagen'; 
-        }
-        return url; // La URL ya debería ser la completa (ej. http://localhost:5000/api/images/nombre.jpg)
-    };
-
-    // Función para manejar errores de carga de imagen
-    const handleImageError = (e) => {
-        e.target.onerror = null; // Evita bucles infinitos de error
-        // Fallback final si la imagen no carga por cualquier razón
-        e.target.src = 'https://placehold.co/400x200/cccccc/000000?text=Error+Carga+Imagen'; 
-    };
-    // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
     const handleDelete = async () => {
         setError(null);
-        // >>>>>>>>>>>>>>> NOTA: window.confirm no funciona en entornos de iFrame. <<<<<<<<<<<<<<<<
-        // Para una aplicación en producción, deberías reemplazar esto con un modal de confirmación personalizado.
         if (window.confirm(`¿Estás seguro de que quieres eliminar el producto "${product.nombre}"? Esta acción es irreversible.`)) {
             setLoading(true);
             try {
-                const response = await api.delete(`/products/${product.id}`); // Usar 'api' en lugar de 'axios'
+                const response = await api.delete(`/products/${product.id}`);
                 
                 if (response.status === 200) {
                     console.log('Producto eliminado:', product.nombre);
@@ -72,15 +48,18 @@ const ProductCard = ({ product, onProductDeleted }) => {
         }
     };
 
+    const canRedeem = isAuthenticated && (user?.role === 'user' || user?.role === 'employee') && product.puntos_canje !== null && product.puntos_canje !== undefined;
+    const hasEnoughPoints = userPoints !== null && product.puntos_canje <= userPoints;
+
     return (
         <Card className="h-100 shadow-sm rounded-lg" style={{ border: '1px solid #e0e0e0' }}>
             {error && <Alert variant="danger" className="m-2">{error}</Alert>}
             <Card.Img
                 variant="top"
-                src={getImageUrl(product.imagen_url)} // product.imagen_url ya debería ser la URL completa o null
+                src={product.imagen_url || 'https://placehold.co/400x200/cccccc/000000?text=Sin+Imagen'}
                 alt={product.nombre}
                 style={{ height: '180px', objectFit: 'cover', borderTopLeftRadius: 'calc(.25rem - 1px)', borderTopRightRadius: 'calc(.25rem - 1px)' }}
-                onError={handleImageError}
+                onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/400x200/cccccc/000000?text=Error+Carga+Imagen'; }}
             />
             <Card.Body className="d-flex flex-column p-3">
                 <Card.Title className="text-truncate mb-2 fw-bold text-dark">{product.nombre}</Card.Title>
@@ -101,7 +80,6 @@ const ProductCard = ({ product, onProductDeleted }) => {
                 </Card.Text>
                 
                 <div className="mt-auto pt-2">
-                    {/* LÓGICA CONDICIONAL PARA PRECIO O PUNTOS_CANJE */}
                     {product.puntos_canje !== null && product.puntos_canje !== undefined ? (
                         <Card.Text className="mb-1 text-success fw-bold fs-5">
                             {product.puntos_canje} Puntos
@@ -111,7 +89,6 @@ const ProductCard = ({ product, onProductDeleted }) => {
                             {formatPrice(product.precio)} / {product.unidad_de_medida}
                         </Card.Text>
                     )}
-                    {/* FIN LÓGICA CONDICIONAL */}
 
                     <Card.Text className="mb-1 text-secondary">
                         Stock: {product.stock}
@@ -145,11 +122,15 @@ const ProductCard = ({ product, onProductDeleted }) => {
                         </Button>
                     </div>
                 )}
-                {/* Botón para canjear productos (visible para usuarios normales en la página de canje) */}
-                {isAuthenticated && user && user.role === 'user' && product.puntos_canje !== null && product.puntos_canje !== undefined && (
+                {canRedeem && (
                     <div className="d-grid gap-2 mt-3">
-                        <Button variant="success" size="md" onClick={() => navigate('/dashboard', { state: { message: `¡Excelente! Muestra tu código QR al vendedor para canjear "${product.nombre}".`, variant: 'success' } })}>
-                            Canjear por {product.puntos_canje} Puntos
+                        <Button 
+                            variant={hasEnoughPoints ? "success" : "outline-secondary"} 
+                            size="md" 
+                            disabled={!hasEnoughPoints}
+                            onClick={() => onRedeemClick(product)}
+                        >
+                            {hasEnoughPoints ? `Canjear por ${product.puntos_canje} Puntos` : 'Puntos Insuficientes'}
                         </Button>
                     </div>
                 )}

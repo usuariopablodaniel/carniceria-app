@@ -49,6 +49,26 @@ const RedemptionProductsPage = () => {
         );
     }, []);
 
+    const handleRedeemClick = (product) => {
+        if (isAuthenticated) {
+            navigate('/dashboard', {
+                state: {
+                    canjeo: true,
+                    productToRedeem: product,
+                    message: `¡Excelente! Muestra tu código QR al vendedor para canjear "${product.nombre}".`,
+                    variant: 'success'
+                }
+            });
+        } else {
+            navigate('/login', {
+                state: {
+                    message: 'Inicia sesión para canjear puntos.',
+                    variant: 'warning'
+                }
+            });
+        }
+    };
+
     useEffect(() => {
         if (!loadingAuth) {
             fetchUserPoints();
@@ -119,10 +139,11 @@ const RedemptionProductsPage = () => {
                 <Row xs={1} md={2} lg={3} className="g-4">
                     {redemptionProducts.map(product => (
                         <Col key={product.id}>
-                            {/* ¡Usamos el componente ProductCard aquí! */}
                             <ProductCard
                                 product={product}
                                 onProductDeleted={onProductDeleted}
+                                userPoints={userPoints} // Pasar los puntos del usuario
+                                onRedeemClick={handleRedeemClick} // Pasar la función de canje
                             />
                         </Col>
                     ))}
