@@ -13,14 +13,14 @@ const RedemptionProductsPage = () => {
     const [error, setError] = useState(null);
     const [userPoints, setUserPoints] = useState(null);
 
-    const getFullImageUrl = useCallback((relativePath) => {
-        if (!relativePath) {
-            return 'https://placehold.co/400x200/cccccc/000000?text=Error+Carga+Imagen';
-        }
-        const baseUrl = import.meta.env.VITE_API_URL;
-        // Corrección: Agregar la ruta al endpoint de imágenes
-        return `${baseUrl}/api/images/${relativePath}`;
-    }, []);
+    // Esta función ya no es necesaria, ya que la API nos da la URL completa.
+    // const getFullImageUrl = useCallback((relativePath) => {
+    //     if (!relativePath) {
+    //         return 'https://placehold.co/400x200/cccccc/000000?text=Error+Carga+Imagen';
+    //     }
+    //     const baseUrl = import.meta.env.VITE_API_URL;
+    //     return `${baseUrl}/api/images/${relativePath}`;
+    // }, []);
 
     const fetchUserPoints = useCallback(async () => {
         if (!isAuthenticated || !user || !user.id) {
@@ -157,7 +157,7 @@ const RedemptionProductsPage = () => {
                             <Card className="h-100 shadow-sm rounded-lg product-card">
                                 <Card.Img
                                     variant="top"
-                                    src={getFullImageUrl(product.image)}
+                                    src={product.imagen_url}
                                     alt={product.name}
                                     style={{ height: '200px', objectFit: 'cover' }}
                                     onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/400x200/cccccc/000000?text=Error+Carga+Imagen'; }}
