@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Container, Row, Col, Card, Spinner, Alert, Button } from 'react-bootstrap'; 
+import { Container, Row, Col, Card, Spinner, Alert, Button, Image } from 'react-bootstrap'; 
 import api from '../api/axios'; 
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -13,14 +13,12 @@ const RedemptionProductsPage = () => {
     const [error, setError] = useState(null);
     const [userPoints, setUserPoints] = useState(null);
 
-    // Esta función ya no es necesaria, ya que la API nos da la URL completa.
-    // const getFullImageUrl = useCallback((relativePath) => {
-    //     if (!relativePath) {
-    //         return 'https://placehold.co/400x200/cccccc/000000?text=Error+Carga+Imagen';
-    //     }
-    //     const baseUrl = import.meta.env.VITE_API_URL;
-    //     return `${baseUrl}/api/images/${relativePath}`;
-    // }, []);
+    const renderSafeValue = useCallback((value, fallback = '') => {
+        if (typeof value === 'object' && value !== null) {
+            return fallback;
+        }
+        return value;
+    }, []);
 
     const fetchUserPoints = useCallback(async () => {
         if (!isAuthenticated || !user || !user.id) {
@@ -103,19 +101,22 @@ const RedemptionProductsPage = () => {
 
     if (loading) {
         return (
-            <Container className="my-5 text-center">
-                <Spinner animation="border" role="status">
+            <div className="d-flex flex-column align-items-center justify-content-center text-center py-5" style={{ minHeight: '400px' }}>
+                <Spinner animation="border" role="status" className="mb-3 text-primary" style={{ width: '3rem', height: '3rem' }}>
                     <span className="visually-hidden">Cargando productos...</span>
                 </Spinner>
-                <p className="mt-3">Cargando productos disponibles para canje...</p>
-            </Container>
+                <p className="text-muted">Cargando productos disponibles para canje...</p>
+            </div>
         );
     }
 
     if (error) {
         return (
-            <Container className="my-5 text-center">
-                <Alert variant="danger">{error}</Alert>
+            <Container className="my-5 d-flex justify-content-center">
+                <Alert variant="danger" className="text-center w-75">
+                    {error}
+                    <Button variant="danger" onClick={fetchRedemptionProducts} className="ms-3 mt-2">Reintentar</Button>
+                </Alert>
             </Container>
         );
     }
@@ -154,18 +155,19 @@ const RedemptionProductsPage = () => {
                 <Row xs={1} md={2} lg={3} className="g-4">
                     {redemptionProducts.map(product => (
                         <Col key={product.id}>
-                            <Card className="h-100 shadow-sm rounded-lg product-card">
-                                <Card.Img
+                            <Card className="h-100 shadow-sm rounded-lg">
+                                <Image
                                     variant="top"
                                     src={product.imagen_url}
-                                    alt={product.name}
-                                    style={{ height: '200px', objectFit: 'cover' }}
+                                    alt={renderSafeValue(product.nombre, 'Producto sin nombre')}
+                                    style={{ height: '200px', width: '100%', objectFit: 'cover' }}
+                                    loading="lazy"
                                     onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/400x200/cccccc/000000?text=Error+Carga+Imagen'; }}
                                 />
                                 <Card.Body className="d-flex flex-column">
-                                    <Card.Title className="text-truncate" title={product.nombre}>{product.nombre}</Card.Title>
+                                    <Card.Title className="text-truncate" title={renderSafeValue(product.nombre, 'Producto sin nombre')}>{product.nombre}</Card.Title>
                                     <Card.Text className="text-muted small mb-2">
-                                        {product.descripcion || 'Sin descripción.'}
+                                        {renderSafeValue(product.descripcion) || 'Sin descripción.'}
                                     </Card.Text>
                                     <div className="mt-auto">
                                         <h5 className="puntos-text text-success mb-2">
