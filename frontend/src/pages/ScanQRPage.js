@@ -17,7 +17,6 @@ const ScanQRPage = () => {
     const [isProcessingPurchase, setIsProcessingPurchase] = useState(false);
     const [isProcessingRedemption, setIsProcessingRedemption] = useState(false);
     const [scannedUserName, setScannedUserName] = useState('');
-    const [isRedemptionScan, setIsRedemptionScan] = useState(false);
     
     const [scannerActive, setScannerActive] = useState(true); 
 
@@ -55,32 +54,28 @@ const ScanQRPage = () => {
         fetchRedemptionProducts();
     }, []);
 
-    const handleRegisterRedemption = useCallback(async (e, userIdFromScan = null, productIdFromScan = null, pointsFromScan = null) => {
+    const handleRegisterRedemption = useCallback(async (e) => {
         if (e) e.preventDefault();
         setMessage('');
         setError('');
         setRedemptionError('');
         setIsProcessingRedemption(true);
 
-        const currentUserId = userIdFromScan || scannedUserId;
-        const currentProductId = productIdFromScan || selectedRedemptionProduct;
-        const currentPoints = pointsFromScan || selectedRedemptionPoints;
-
-        if (!currentUserId) {
+        if (!scannedUserId) {
             setRedemptionError('Por favor, escanea un código QR de usuario primero.');
             setIsProcessingRedemption(false);
             return;
         }
-        if (!currentProductId || currentPoints <= 0) {
+        if (!selectedRedemptionProduct || selectedRedemptionPoints <= 0) {
             setRedemptionError('Por favor, selecciona un producto de canje válido.');
             setIsProcessingRedemption(false);
             return;
         }
         try {
             const response = await axios.post('/transactions/redeem', {
-                userId: currentUserId,
-                pointsToRedeem: currentPoints,
-                productId: currentProductId
+                userId: scannedUserId,
+                pointsToRedeem: selectedRedemptionPoints,
+                productId: selectedRedemptionProduct
             });
             if (response.status === 200) {
                 setMessage(response.data.message + ` Puntos restantes: ${response.data.newPoints}`);
@@ -88,7 +83,6 @@ const ScanQRPage = () => {
                 setSelectedRedemptionPoints(0);
                 setScannedUserId(null); 
                 setScannedUserName('');
-                setIsRedemptionScan(false);
             } else {
                 setRedemptionError(response.data.error || 'Error desconocido al registrar el canje.');
             }
@@ -105,43 +99,19 @@ const ScanQRPage = () => {
                 setScannerActive(true); 
             }, 500);
         }
-    }, [scannedUserId, selectedRedemptionProduct, selectedRedemptionPoints, setMessage, setError, setRedemptionError, setIsProcessingRedemption, setScannedUserId, setScannedUserName, setIsRedemptionScan, setSelectedRedemptionProduct, setSelectedRedemptionPoints, setScannerActive]);
+    }, [scannedUserId, selectedRedemptionProduct, selectedRedemptionPoints, setMessage, setError, setRedemptionError, setIsProcessingRedemption, setScannedUserId, setScannedUserName, setSelectedRedemptionProduct, setSelectedRedemptionPoints, setScannerActive]);
 
-    const onNewScanResult = useCallback(async (decodedText, decodedResult) => {
+
+    const onNewScanResult = useCallback(async (decodedText) => {
         setScannerActive(false); 
         setMessage('');
         setError('');
         setRedemptionError('');
         setScannedUserName('');
         setAmount('');
-        
-        let scannedUserId = null;
-        let isRedemption = false;
-        let selectedProduct = null;
 
-        try {
-            const data = JSON.parse(decodedText);
-            if (data.userId && data.productId) {
-                scannedUserId = data.userId.toString();
-                const product = redemptionProducts.find(p => p.id === data.productId);
-                if (product) {
-                    isRedemption = true;
-                    selectedProduct = product;
-                    setSelectedRedemptionProduct(product.id.toString());
-                    setSelectedRedemptionPoints(product.puntos_canje);
-                    setMessage(`Producto de canje detectado: ${product.nombre}`);
-                } else {
-                    setError('Producto de canje no encontrado. Escanea un QR de usuario normal.');
-                }
-            } else {
-                scannedUserId = decodedText;
-            }
-        } catch (e) {
-            scannedUserId = decodedText;
-        }
-
+        let scannedUserId = decodedText;
         setScannedUserId(scannedUserId);
-        setIsRedemptionScan(isRedemption);
 
         if (scannedUserId) {
             try {
@@ -161,10 +131,7 @@ const ScanQRPage = () => {
             amountInputRef.current.focus();
         }
 
-        if (isRedemption && selectedProduct) {
-            handleRegisterRedemption(null, scannedUserId, selectedProduct.id, selectedProduct.puntos_canje);
-        }
-    }, [redemptionProducts, handleRegisterRedemption]);
+    }, []);
 
     const handleRegisterPurchase = async (e) => {
         e.preventDefault();
@@ -191,7 +158,6 @@ const ScanQRPage = () => {
                 setAmount('');
                 setScannedUserId(null); 
                 setScannedUserName('');
-                setIsRedemptionScan(false);
             } else {
                 setError(response.data.error || 'Error desconocido al registrar la compra.');
             }
@@ -231,7 +197,6 @@ const ScanQRPage = () => {
         setMessage('');
         setError('');
         setRedemptionError('');
-        setIsRedemptionScan(false);
     };
 
     if (loadingAuth || !isAuthenticated || (user && user.role !== 'admin' && user.role !== 'employee')) {
@@ -284,10 +249,8 @@ const ScanQRPage = () => {
                 </Col>
                 <Col md={6}>
                     <Card className="p-3 h-100">
-                        <Card.Title className="text-center mb-3">
-                            {isRedemptionScan ? 'Confirmar Canje' : 'Registrar Transacción'}
-                        </Card.Title>
-                        <Form onSubmit={isRedemptionScan ? handleRegisterRedemption : handleRegisterPurchase}>
+                        <Card.Title className="text-center mb-3">Registrar Transacción</Card.Title>
+                        <Form onSubmit={handleRegisterPurchase}>
                             <Form.Group className="mb-3">
                                 <Form.Label>Usuario Escaneado:</Form.Label>
                                 <Form.Control 
@@ -298,93 +261,75 @@ const ScanQRPage = () => {
                                 />
                             </Form.Group>
                             
-                            {isRedemptionScan ? (
-                                <>
-                                    <Form.Group className="mb-3">
-                                        <Form.Label>Producto a Canjear</Form.Label>
-                                        <Form.Control 
-                                            type="text"
-                                            value={redemptionProducts.find(p => p.id.toString() === selectedRedemptionProduct)?.nombre || ''}
-                                            readOnly
-                                            disabled={true}
-                                        />
-                                    </Form.Group>
-                                    <Form.Group className="mb-3">
-                                        <Form.Label>Puntos a Descontar</Form.Label>
-                                        <Form.Control
-                                            type="number"
-                                            value={selectedRedemptionPoints}
-                                            readOnly
-                                            disabled={true}
-                                        />
-                                    </Form.Group>
-                                </>
-                            ) : (
-                                <>
-                                    <Form.Group className="mb-3" controlId="formAmount">
-                                        <Form.Label>Monto de la Compra ($ARS)</Form.Label>
-                                        <Form.Control
-                                            type="number"
-                                            placeholder="Ej: 15000.50"
-                                            step="0.01"
-                                            value={amount}
-                                            onChange={(e) => setAmount(e.target.value)}
-                                            disabled={!scannedUserId || isProcessingPurchase}
-                                            ref={amountInputRef}
-                                            required
-                                        />
-                                    </Form.Group>
-                                    <h5 className="text-center text-muted my-3">ó</h5>
-                                    <Form.Group className="mb-3" controlId="formRedemptionProduct">
-                                        <Form.Label>Canjear Producto (Selección Manual)</Form.Label>
-                                        <Form.Control
-                                            as="select"
-                                            value={selectedRedemptionProduct}
-                                            onChange={handleProductSelectChange}
-                                            disabled={!scannedUserId || loadingRedemptionProducts || isProcessingRedemption}
-                                            required={scannedUserId && !isRedemptionScan}
-                                        >
-                                            <option value="">Selecciona un producto...</option>
-                                            {redemptionProducts.map(p => (
-                                                <option key={p.id} value={p.id}>{p.nombre} ({p.puntos_canje} puntos)</option>
-                                            ))}
-                                        </Form.Control>
-                                    </Form.Group>
-                                    <Form.Group className="mb-3">
-                                        <Form.Label>Puntos de Canje</Form.Label>
-                                        <Form.Control
-                                            type="number"
-                                            value={selectedRedemptionPoints}
-                                            readOnly
-                                            disabled={true}
-                                        />
-                                    </Form.Group>
-                                </>
-                            )}
+                            <Form.Group className="mb-3" controlId="formAmount">
+                                <Form.Label>Monto de la Compra ($ARS)</Form.Label>
+                                <Form.Control
+                                    type="number"
+                                    placeholder="Ej: 15000.50"
+                                    step="0.01"
+                                    value={amount}
+                                    onChange={(e) => setAmount(e.target.value)}
+                                    disabled={!scannedUserId || isProcessingPurchase}
+                                    ref={amountInputRef}
+                                />
+                            </Form.Group>
                             <Button 
-                                variant={isRedemptionScan ? "success" : "primary"}
+                                variant="primary"
                                 type="submit" 
                                 className="w-100" 
-                                disabled={isRedemptionScan ? isProcessingRedemption : isProcessingPurchase}
+                                disabled={!scannedUserId || isProcessingPurchase}
                             >
-                                {isRedemptionScan ? (
-                                    isProcessingRedemption ? (
-                                        <>
-                                            <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
-                                            Procesando Canje...
-                                        </>
-                                    ) : (
-                                        'Confirmar Canje'
-                                    )
+                                {isProcessingPurchase ? (
+                                    <>
+                                        <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
+                                        Procesando Compra...
+                                    </>
                                 ) : (
-                                    isProcessingPurchase ? (
-                                        <>
-                                            <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
-                                            Procesando Compra...
-                                        </>
-                                    ) : (
-                                        'Registrar Transacción'
-                                    )
+                                    'Registrar Compra'
+                                )}
+                            </Button>
+                        </Form>
+
+                        <h5 className="text-center text-muted my-3">ó</h5>
+
+                        <Form onSubmit={handleRegisterRedemption}>
+                            <Form.Group className="mb-3" controlId="formRedemptionProduct">
+                                <Form.Label>Canjear Producto</Form.Label>
+                                <Form.Control
+                                    as="select"
+                                    value={selectedRedemptionProduct}
+                                    onChange={handleProductSelectChange}
+                                    disabled={!scannedUserId || loadingRedemptionProducts || isProcessingRedemption}
+                                    required
+                                >
+                                    <option value="">Selecciona un producto...</option>
+                                    {redemptionProducts.map(p => (
+                                        <option key={p.id} value={p.id}>{p.nombre} ({p.puntos_canje} puntos)</option>
+                                    ))}
+                                </Form.Control>
+                            </Form.Group>
+                            <Form.Group className="mb-3">
+                                <Form.Label>Puntos a Descontar</Form.Label>
+                                <Form.Control
+                                    type="number"
+                                    value={selectedRedemptionPoints}
+                                    readOnly
+                                    disabled={true}
+                                />
+                            </Form.Group>
+                            <Button 
+                                variant="success"
+                                type="submit" 
+                                className="w-100" 
+                                disabled={!scannedUserId || !selectedRedemptionProduct || isProcessingRedemption}
+                            >
+                                {isProcessingRedemption ? (
+                                    <>
+                                        <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
+                                        Procesando Canje...
+                                    </>
+                                ) : (
+                                    'Registrar Canje'
                                 )}
                             </Button>
                         </Form>
