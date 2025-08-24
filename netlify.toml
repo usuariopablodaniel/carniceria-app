@@ -1,0 +1,9 @@
+# Archivo netlify.toml en la raíz del proyecto
+[build]
+  command = "npm run build"
+  publish = "frontend/build"
+
+[[redirects]]
+  from = "/politica-de-privacidad"
+  to = "/politica-de-privacidad.html"
+  status = 200
