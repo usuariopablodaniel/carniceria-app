@@ -26,7 +26,7 @@ const AppNavbar = () => {
         <Navbar bg="dark" variant="dark" expand="lg" className="shadow-sm" expanded={showMenu}>
             <Container>
                 <Navbar.Brand as={NavLink} to={brandNavLinkTo} onClick={closeMenu}>
-                    Carnicería App
+                    Carnicería 9 de Julio
                 </Navbar.Brand>
 
                 <Navbar.Toggle aria-controls="basic-navbar-nav" onClick={() => setShowMenu(!showMenu)} />
@@ -58,9 +58,10 @@ const AppNavbar = () => {
                         )}
                     </Nav>
                     <Nav>
-                        {/* >>>>> Enlace de Contacto movido a esta sección final <<<<< */}
+                        {/* Enlaces de información y política de privacidad */}
                         <Nav.Link as={NavLink} to="/contact" className="text-white" onClick={closeMenu}>Contacto</Nav.Link>
-                        
+                        <Nav.Link as={NavLink} to="/politica-de-privacidad" className="text-white" onClick={closeMenu}>Política de Privacidad</Nav.Link>
+
                         {/* Botones de autenticación */}
                         {isAuthenticated ? (
                             <>
@@ -96,4 +97,3 @@ const AppNavbar = () => {
 };
 
 export default AppNavbar;
-
