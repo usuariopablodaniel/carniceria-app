@@ -1,5 +1,6 @@
 # Archivo netlify.toml en la raíz del proyecto
 [build]
+  base = "frontend"
   command = "npm run build"
   publish = "frontend/build"
 
