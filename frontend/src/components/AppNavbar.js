@@ -61,7 +61,7 @@ const AppNavbar = () => {
                         {/* Enlaces de información y política de privacidad */}
                         <Nav.Link as={NavLink} to="/contact" className="text-white" onClick={closeMenu}>Contacto</Nav.Link>
                         <Nav.Link as={NavLink} to="/politica-de-privacidad.html" className="text-white" onClick={closeMenu}>Política de Privacidad</Nav.Link>
-
+                        <Nav.Link as={NavLink} to="/terminos-de-servicio.html" className="text-white" onClick={closeMenu}>Condiciones del Servicio</Nav.Link>
                         {/* Botones de autenticación */}
                         {isAuthenticated ? (
                             <>
