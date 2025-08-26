@@ -61,27 +61,54 @@ const ScanQRPage = () => {
         setRedemptionError('');
         setScannedUserName('');
         setAmount('');
-        setSelectedRedemptionProduct('');
-        setSelectedRedemptionPoints(0);
-
-        setScannedUserId(decodedText);
+        
+        let userId = null;
+        let redemptionProductId = null;
 
         try {
-            const response = await axios.get(`/auth/user/${decodedText}`); 
-            if (response.data && response.data.user) {
-                setScannedUserName(response.data.user.nombre || response.data.user.name || `ID: ${decodedText}`);
+            // Intenta analizar el QR como JSON
+            const data = JSON.parse(decodedText);
+            if (data.userId && data.productId) {
+                userId = data.userId;
+                redemptionProductId = data.productId;
+                setSelectedRedemptionProduct(redemptionProductId); // Establece el producto de canje automáticamente
             } else {
-                setScannedUserName(`ID: ${decodedText}`);
+                // Si no tiene el formato esperado, asume que es un simple ID
+                userId = decodedText;
+                setSelectedRedemptionProduct('');
+            }
+        } catch (e) {
+            // Si el análisis falla, asume que es un simple ID
+            userId = decodedText;
+            setSelectedRedemptionProduct('');
+        }
+
+        setScannedUserId(userId);
+
+        try {
+            const response = await axios.get(`/auth/user/${userId}`); 
+            if (response.data && response.data.user) {
+                setScannedUserName(response.data.user.nombre || response.data.user.name || `ID: ${userId}`);
+            } else {
+                setScannedUserName(`ID: ${userId}`);
             }
         } catch (fetchUserError) {
             console.error('ScanQRPage: Error al obtener nombre de usuario escaneado:', fetchUserError.response ? fetchUserError.response.data : fetchUserError.message);
-            setScannedUserName(`ID: ${decodedText} (Error al cargar nombre)`);
+            setScannedUserName(`ID: ${userId} (Error al cargar nombre)`);
+        }
+        
+        // La lógica para establecer los puntos del producto seleccionado (si existe)
+        if (redemptionProductId) {
+            const product = redemptionProducts.find(p => p.id.toString() === redemptionProductId.toString());
+            setSelectedRedemptionPoints(product ? product.puntos_canje : 0);
+        } else {
+            setSelectedRedemptionPoints(0);
         }
 
         if (amountInputRef.current) {
             amountInputRef.current.focus();
         }
-    }, [setScannerActive, setScannedUserId, setScannedUserName, setMessage, setError, setRedemptionError, setAmount, setSelectedRedemptionProduct, setSelectedRedemptionPoints, amountInputRef]);
+    }, [setScannerActive, setScannedUserId, setScannedUserName, setMessage, setError, setRedemptionError, setAmount, setSelectedRedemptionProduct, setSelectedRedemptionPoints, amountInputRef, redemptionProducts]);
 
     const handleRegisterPurchase = async (e) => {
         e.preventDefault();
