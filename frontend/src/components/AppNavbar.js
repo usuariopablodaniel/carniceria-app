@@ -1,4 +1,3 @@
-// frontend/src/components/AppNavbar.js
 import React, { useState } from 'react';
 import { Navbar, Nav, Button, Container } from 'react-bootstrap';
 import { NavLink, useNavigate } from 'react-router-dom';
@@ -19,6 +18,24 @@ const AppNavbar = () => {
     };
 
     const closeMenu = () => setShowMenu(false);
+
+    const handleShare = async () => {
+        closeMenu();
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: 'Carniceria 9 de Julio App',
+                    text: '¡Descarga nuestra app y haz tus pedidos fácilmente!',
+                    url: 'https://carniceria9dejulio.netlify.app'
+                });
+                console.log('Contenido compartido con éxito');
+            } catch (error) {
+                console.error('Error al compartir:', error);
+            }
+        } else {
+            console.error('El navegador no soporta la función de compartir.');
+        }
+    };
 
     const brandNavLinkTo = isAuthenticated ? "/dashboard" : "/";
 
@@ -60,8 +77,15 @@ const AppNavbar = () => {
                     <Nav>
                         {/* Enlaces de información y política de privacidad */}
                         <Nav.Link as={NavLink} to="/contact" className="text-white" onClick={closeMenu}>Contacto</Nav.Link>
+                        
+                        {/* Botón de compartir, visible solo si el navegador lo soporta */}
+                        {navigator.share && (
+                           <Nav.Link as="button" onClick={handleShare} className="text-white">Compartir App</Nav.Link>
+                        )}
+                        
                         <Nav.Link as={NavLink} to="/politica-de-privacidad.html" className="text-white" onClick={closeMenu}>Política de Privacidad</Nav.Link>
                         <Nav.Link as={NavLink} to="/terminos-de-servicio.html" className="text-white" onClick={closeMenu}>Condiciones del Servicio</Nav.Link>
+                        
                         {/* Botones de autenticación */}
                         {isAuthenticated ? (
                             <>
