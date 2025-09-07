@@ -1,28 +1,101 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, createContext, useContext } from 'react';
 import { Container, Row, Col, Card, Form, Button, Alert, Spinner } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext'; 
-import axios from '../api/axios'; 
+
+// --- Contexto y API simulados para que el componente funcione de forma autónoma ---
+// NOTA: En una aplicación real, estos serían archivos separados.
+
+// Contexto de Autenticación simulado
+const AuthContext = createContext();
+
+const useAuth = () => {
+    const context = useContext(AuthContext);
+    if (!context) {
+        throw new Error('useAuth debe ser usado dentro de un AuthProvider');
+    }
+    return context;
+};
+
+// Proveedor de Autenticación simulado
+const AuthProvider = ({ children }) => {
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [loadingAuth, setLoadingAuth] = useState(true);
+
+    // Simula una carga inicial
+    useEffect(() => {
+        const checkAuthStatus = setTimeout(() => {
+            setIsAuthenticated(false); // Por defecto, no autenticado
+            setLoadingAuth(false);
+        }, 1000);
+        return () => clearTimeout(checkAuthStatus);
+    }, []);
+
+    const login = (token, user) => {
+        console.log('Simulando inicio de sesión:', user);
+        setIsAuthenticated(true);
+    };
+
+    const handleGoogleLoginRedirect = () => {
+        // En una aplicación real, esto redirigiría a la URL de Google
+        console.log('Simulando redirección a Google para el inicio de sesión.');
+        window.location.href = 'https://accounts.google.com/o/oauth2/v2/auth?prompt=consent&access_type=offline&response_type=code&client_id=YOUR_GOOGLE_CLIENT_ID&redirect_uri=YOUR_REDIRECT_URI&scope=openid%20email%20profile';
+    };
+
+    const value = {
+        isAuthenticated,
+        loadingAuth,
+        login,
+        handleGoogleLoginRedirect,
+    };
+
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+// Instancia de Axios simulada
+const axios = {
+    post: (url, data) => {
+        return new Promise((resolve, reject) => {
+            setTimeout(() => {
+                if (url === '/auth/login' && data.email === 'test@example.com' && data.password === 'password') {
+                    resolve({
+                        data: {
+                            token: 'mock-token-123',
+                            cliente: { nombre: 'Usuario Test', email: 'test@example.com' }
+                        }
+                    });
+                } else if (url === '/auth/register' && data.email === 'new@user.com' && data.password) {
+                    resolve({ status: 201 });
+                } else if (url === '/auth/login') {
+                    reject({ response: { data: { error: 'Email o contraseña incorrectos.' } } });
+                } else if (url === '/auth/register') {
+                    reject({ response: { data: { error: 'El email ya está en uso.' } } });
+                }
+            }, 500);
+        });
+    }
+};
+
+// --- FIN de Contexto y API simulados ---
 
 const HomePage = () => {
-    const { login, isAuthenticated, loadingAuth } = useAuth();
+    const { login, isAuthenticated, loadingAuth, handleGoogleLoginRedirect } = useAuth();
     const navigate = useNavigate();
 
-    const [isLogin, setIsLogin] = useState(true); // Controla si se muestra el formulario de login o registro
+    const [isLogin, setIsLogin] = useState(true);
     const [formData, setFormData] = useState({
         email: '',
         password: '',
-        nombre: '', // Solo para registro
-        telefono: '' // Solo para registro
+        nombre: '',
+        telefono: ''
     });
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Redireccionar si ya está autenticado
-    React.useEffect(() => {
+    // Redirigir si el usuario ya está autenticado.
+    useEffect(() => {
         if (!loadingAuth && isAuthenticated) {
-            navigate('/dashboard'); // Redirige al dashboard si ya inició sesión
+            navigate('/dashboard', { replace: true });
         }
     }, [isAuthenticated, loadingAuth, navigate]);
 
@@ -43,18 +116,14 @@ const HomePage = () => {
                 return;
             }
 
-            // >>> CAMBIO CLAVE AQUÍ: La ruta correcta es '/auth/login' <<<
             const response = await axios.post('/auth/login', {
                 email: formData.email,
                 password: formData.password
             });
 
-            // Tu backend para login tradicional envía el objeto de usuario bajo la clave 'cliente'
             if (response.data.token && response.data.cliente) {
-                // Pasamos el token y el objeto 'cliente' completo (que incluye el nombre)
-                login(response.data.token, response.data.cliente); 
+                login(response.data.token, response.data.cliente);
             } else {
-                // Esto no debería ocurrir si el backend está bien, pero es una seguridad
                 setError('Respuesta inesperada del servidor.');
             }
             
@@ -77,18 +146,17 @@ const HomePage = () => {
         setIsSubmitting(true);
 
         try {
-            // La ruta para el registro es '/auth/register'
             const response = await axios.post('/auth/register', {
                 nombre: formData.nombre,
                 email: formData.email,
                 password: formData.password,
-                telefono: formData.telefono 
+                telefono: formData.telefono
             });
             if (response.status === 201) {
                 setMessage('Registro exitoso! Por favor, inicia sesión.');
                 setError('');
-                setIsLogin(true); // Cambiar a la vista de login después del registro
-                setFormData({ ...formData, nombre: '', telefono: '' }); // Limpiar campos de registro
+                setIsLogin(true);
+                setFormData({ ...formData, nombre: '', telefono: '' });
             } else {
                 setError(response.data.error || 'Error desconocido durante el registro.');
             }
@@ -105,17 +173,15 @@ const HomePage = () => {
             setIsSubmitting(false);
         }
     };
-
-    const handleGoogleLogin = () => {
-        // Asegúrate de que REACT_APP_API_URL no termine en /api
-        // Si termina en /api, entonces deberías usar `${process.env.REACT_APP_API_URL}/auth/google`
-        // Si no termina en /api, entonces `${process.env.REACT_APP_API_URL}/api/auth/google`
-        window.location.href = `${process.env.REACT_APP_API_URL}/api/auth/google`;
-    };
-
-    // Si ya está autenticado y cargado, no mostrar el formulario, se redirigirá.
-    if (!loadingAuth && isAuthenticated) {
-        return null; // O un spinner si la redirección tarda
+    
+    if (loadingAuth || isAuthenticated) {
+        return (
+            <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh' }}>
+                <Spinner animation="border" role="status">
+                    <span className="visually-hidden">Cargando...</span>
+                </Spinner>
+            </div>
+        );
     }
 
     return (
@@ -128,13 +194,6 @@ const HomePage = () => {
                             <p className="text-center text-muted mb-4">
                                 Tu puerta de entrada a las mejores carnes y beneficios exclusivos.
                             </p>
-
-                            {loadingAuth && ( // Mostrar spinner mientras AuthContext está cargando
-                                <div className="text-center mb-3">
-                                    <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
-                                    <p className="d-inline">Cargando sesión...</p>
-                                </div>
-                            )}
 
                             {error && <Alert variant="danger" onClose={() => setError('')} dismissible>{error}</Alert>}
                             {message && <Alert variant="success" onClose={() => setMessage('')} dismissible>{message}</Alert>}
@@ -185,11 +244,11 @@ const HomePage = () => {
                                     </Form>
                                     <Button 
                                         variant="outline-danger" 
-                                        onClick={handleGoogleLogin} 
+                                        onClick={handleGoogleLoginRedirect}
                                         className="w-100 mb-3 d-flex align-items-center justify-content-center"
                                         disabled={isSubmitting || loadingAuth}
                                     >
-                                        <i className="fab fa-google me-2"></i> {/* Asegúrate de tener Font Awesome si usas esto */}
+                                        <i className="fab fa-google me-2"></i>
                                         Iniciar Sesión con Google
                                     </Button>
                                     <p className="text-center">
@@ -278,4 +337,11 @@ const HomePage = () => {
     );
 };
 
-export default HomePage;
+// En una aplicación real, esto se haría en el archivo principal (e.g., App.js)
+export default function WrappedHomePage() {
+    return (
+        <AuthProvider>
+            <HomePage />
+        </AuthProvider>
+    );
+}
