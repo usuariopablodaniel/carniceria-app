@@ -3,7 +3,8 @@ import { Container, Row, Col, Card, Form, Button, Alert, Spinner } from 'react-b
 import { Link, useNavigate } from 'react-router-dom';
 
 // --- Contexto y API simulados para que el componente funcione de forma autónoma ---
-// NOTA: En una aplicación real, estos serían archivos separados.
+// NOTA: En este entorno, los archivos se compilan de forma individual,
+// por lo que todas las dependencias deben estar en el mismo archivo.
 
 // Contexto de Autenticación simulado
 const AuthContext = createContext();
@@ -337,11 +338,10 @@ const HomePage = () => {
     );
 };
 
-// En una aplicación real, esto se haría en el archivo principal (e.g., App.js)
-export default function WrappedHomePage() {
-    return (
-        <AuthProvider>
-            <HomePage />
-        </AuthProvider>
-    );
-}
+const HomePageWrapper = () => (
+    <AuthProvider>
+        <HomePage />
+    </AuthProvider>
+);
+
+export default HomePageWrapper;
