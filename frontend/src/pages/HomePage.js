@@ -1,88 +1,63 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { Container, Row, Col, Card, Form, Button, Alert, Spinner } from 'react-bootstrap';
-import { Link, useNavigate } from 'react-router-dom';
+import 'bootstrap/dist/css/bootstrap.min.css';
 
-// --- Contexto y API simulados para que el componente funcione de forma autónoma ---
-// NOTA: En este entorno, los archivos se compilan de forma individual,
-// por lo que todas las dependencias deben estar en el mismo archivo.
+// Contexto de autenticación para toda la aplicación
+const AuthContext = createContext(null);
 
-// Contexto de Autenticación simulado
-const AuthContext = createContext();
-
-const useAuth = () => {
-    const context = useContext(AuthContext);
-    if (!context) {
-        throw new Error('useAuth debe ser usado dentro de un AuthProvider');
-    }
-    return context;
-};
-
-// Proveedor de Autenticación simulado
+// Proveedor de autenticación que maneja el estado de inicio de sesión
 const AuthProvider = ({ children }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [loadingAuth, setLoadingAuth] = useState(true);
+    const [user, setUser] = useState(null);
 
-    // Simula una carga inicial
     useEffect(() => {
-        const checkAuthStatus = setTimeout(() => {
-            setIsAuthenticated(false); // Por defecto, no autenticado
-            setLoadingAuth(false);
-        }, 1000);
-        return () => clearTimeout(checkAuthStatus);
+        // Simular la verificación de autenticación. En una aplicación real,
+        // esto verificaría un token en localStorage o una sesión.
+        const token = localStorage.getItem('token');
+        if (token) {
+            try {
+                const storedUser = JSON.parse(localStorage.getItem('user'));
+                if (storedUser) {
+                    setIsAuthenticated(true);
+                    setUser(storedUser);
+                }
+            } catch (e) {
+                console.error("Error parsing user from localStorage", e);
+                localStorage.clear();
+            }
+        }
+        setLoadingAuth(false);
     }, []);
 
-    const login = (token, user) => {
-        console.log('Simulando inicio de sesión:', user);
+    const login = (token, userData) => {
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(userData));
         setIsAuthenticated(true);
+        setUser(userData);
     };
 
-    const handleGoogleLoginRedirect = () => {
-        // En una aplicación real, esto redirigiría a la URL de Google
-        console.log('Simulando redirección a Google para el inicio de sesión.');
-        window.location.href = 'https://accounts.google.com/o/oauth2/v2/auth?prompt=consent&access_type=offline&response_type=code&client_id=YOUR_GOOGLE_CLIENT_ID&redirect_uri=YOUR_REDIRECT_URI&scope=openid%20email%20profile';
+    const logout = () => {
+        localStorage.clear();
+        setIsAuthenticated(false);
+        setUser(null);
     };
 
-    const value = {
-        isAuthenticated,
-        loadingAuth,
-        login,
-        handleGoogleLoginRedirect,
-    };
+    const value = { isAuthenticated, loadingAuth, user, login, logout };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// Instancia de Axios simulada
-const axios = {
-    post: (url, data) => {
-        return new Promise((resolve, reject) => {
-            setTimeout(() => {
-                if (url === '/auth/login' && data.email === 'test@example.com' && data.password === 'password') {
-                    resolve({
-                        data: {
-                            token: 'mock-token-123',
-                            cliente: { nombre: 'Usuario Test', email: 'test@example.com' }
-                        }
-                    });
-                } else if (url === '/auth/register' && data.email === 'new@user.com' && data.password) {
-                    resolve({ status: 201 });
-                } else if (url === '/auth/login') {
-                    reject({ response: { data: { error: 'Email o contraseña incorrectos.' } } });
-                } else if (url === '/auth/register') {
-                    reject({ response: { data: { error: 'El email ya está en uso.' } } });
-                }
-            }, 500);
-        });
-    }
+// Hook personalizado para usar el contexto de autenticación
+const useAuth = () => {
+    return useContext(AuthContext);
 };
 
-// --- FIN de Contexto y API simulados ---
-
-const HomePage = () => {
-    const { login, isAuthenticated, loadingAuth, handleGoogleLoginRedirect } = useAuth();
-    const navigate = useNavigate();
-
+// Componente principal de la aplicación, ahora contiene toda la lógica.
+const App = () => {
+    const { login, isAuthenticated, loadingAuth, user, logout } = useAuth();
     const [isLogin, setIsLogin] = useState(true);
+    const [isDashboard, setIsDashboard] = useState(false);
     const [formData, setFormData] = useState({
         email: '',
         password: '',
@@ -93,12 +68,14 @@ const HomePage = () => {
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Redirigir si el usuario ya está autenticado.
+    // Reemplaza la navegación con un cambio de estado
     useEffect(() => {
         if (!loadingAuth && isAuthenticated) {
-            navigate('/dashboard', { replace: true });
+            setIsDashboard(true);
+        } else {
+            setIsDashboard(false);
         }
-    }, [isAuthenticated, loadingAuth, navigate]);
+    }, [isAuthenticated, loadingAuth]);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -110,6 +87,8 @@ const HomePage = () => {
         setError('');
         setIsSubmitting(true);
 
+        const API_URL = 'https://carniceria-api-vmy1.onrender.com/api/auth/login';
+
         try {
             if (!formData.email || !formData.password) {
                 setError('Por favor, ingresa tu email y contraseña.');
@@ -117,24 +96,27 @@ const HomePage = () => {
                 return;
             }
 
-            const response = await axios.post('/auth/login', {
-                email: formData.email,
-                password: formData.password
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: formData.email, password: formData.password })
             });
 
-            if (response.data.token && response.data.cliente) {
-                login(response.data.token, response.data.cliente);
+            const data = await response.json();
+
+            if (response.ok) {
+                if (data.token && data.cliente) {
+                    login(data.token, data.cliente);
+                    // No hay redirección, se cambia el estado del componente
+                } else {
+                    setError('Respuesta inesperada del servidor.');
+                }
             } else {
-                setError('Respuesta inesperada del servidor.');
+                setError(data.error || 'Error al iniciar sesión.');
             }
-            
         } catch (err) {
             console.error('Error de inicio de sesión:', err);
-            if (err.response) {
-                setError(err.response.data.error || 'Error al iniciar sesión.');
-            } else {
-                setError('No se pudo conectar con el servidor. Intenta de nuevo más tarde.');
-            }
+            setError('No se pudo conectar con el servidor. Intenta de nuevo más tarde.');
         } finally {
             setIsSubmitting(false);
         }
@@ -146,42 +128,68 @@ const HomePage = () => {
         setError('');
         setIsSubmitting(true);
 
+        const API_URL = 'https://carniceria-api-vmy1.onrender.com/api/auth/register';
+
         try {
-            const response = await axios.post('/auth/register', {
-                nombre: formData.nombre,
-                email: formData.email,
-                password: formData.password,
-                telefono: formData.telefono
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    nombre: formData.nombre,
+                    email: formData.email,
+                    password: formData.password,
+                    telefono: formData.telefono
+                })
             });
-            if (response.status === 201) {
+
+            const data = await response.json();
+
+            if (response.ok) {
                 setMessage('Registro exitoso! Por favor, inicia sesión.');
                 setError('');
                 setIsLogin(true);
                 setFormData({ ...formData, nombre: '', telefono: '' });
             } else {
-                setError(response.data.error || 'Error desconocido durante el registro.');
+                setError(data.error || 'Error desconocido durante el registro.');
             }
         } catch (err) {
             console.error('Error de registro:', err);
-            if (err.response) {
-                setError(err.response.data.error || 'Error al registrar usuario (respuesta del servidor).');
-            } else if (err.request) {
-                setError('No se pudo conectar con el servidor. Intenta de nuevo más tarde.');
-            } else {
-                setError('Ocurrió un error inesperado al procesar la solicitud.');
-            }
+            setError('No se pudo conectar con el servidor. Intenta de nuevo más tarde.');
         } finally {
             setIsSubmitting(false);
         }
     };
-    
-    if (loadingAuth || isAuthenticated) {
+
+    const handleGoogleLoginRedirect = () => {
+        window.location.href = 'https://carniceria-api-vmy1.onrender.com/api/auth/google';
+    };
+
+    if (loadingAuth) {
         return (
             <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh' }}>
                 <Spinner animation="border" role="status">
                     <span className="visually-hidden">Cargando...</span>
                 </Spinner>
             </div>
+        );
+    }
+
+    if (isDashboard) {
+        return (
+            <Container className="my-5">
+                <Row className="justify-content-center">
+                    <Col md={8} lg={6}>
+                        <Card className="shadow-lg p-4 text-center">
+                            <Card.Body>
+                                <h1 className="text-primary mb-3">Dashboard de Usuario</h1>
+                                <p className="lead">Bienvenido, {user.nombre}!</p>
+                                <p className="text-muted">Has iniciado sesión con éxito.</p>
+                                <Button variant="danger" onClick={logout}>Cerrar Sesión</Button>
+                            </Card.Body>
+                        </Card>
+                    </Col>
+                </Row>
+            </Container>
         );
     }
 
@@ -227,10 +235,10 @@ const HomePage = () => {
                                             />
                                         </Form.Group>
 
-                                        <Button 
-                                            variant="primary" 
-                                            type="submit" 
-                                            className="w-100 mb-3" 
+                                        <Button
+                                            variant="primary"
+                                            type="submit"
+                                            className="w-100 mb-3"
                                             disabled={isSubmitting || loadingAuth}
                                         >
                                             {isSubmitting ? (
@@ -243,8 +251,8 @@ const HomePage = () => {
                                             )}
                                         </Button>
                                     </Form>
-                                    <Button 
-                                        variant="outline-danger" 
+                                    <Button
+                                        variant="outline-danger"
                                         onClick={handleGoogleLoginRedirect}
                                         className="w-100 mb-3 d-flex align-items-center justify-content-center"
                                         disabled={isSubmitting || loadingAuth}
@@ -254,7 +262,7 @@ const HomePage = () => {
                                     </Button>
                                     <p className="text-center">
                                         ¿No tienes una cuenta?{' '}
-                                        <Link to="#" onClick={() => setIsLogin(false)}>Regístrate aquí</Link>
+                                        <Button variant="link" onClick={() => setIsLogin(false)}>Regístrate aquí</Button>
                                     </p>
                                 </>
                             ) : (
@@ -308,10 +316,10 @@ const HomePage = () => {
                                             />
                                         </Form.Group>
 
-                                        <Button 
-                                            variant="success" 
-                                            type="submit" 
-                                            className="w-100 mb-3" 
+                                        <Button
+                                            variant="success"
+                                            type="submit"
+                                            className="w-100 mb-3"
                                             disabled={isSubmitting || loadingAuth}
                                         >
                                             {isSubmitting ? (
@@ -326,7 +334,7 @@ const HomePage = () => {
                                     </Form>
                                     <p className="text-center">
                                         ¿Ya tienes una cuenta?{' '}
-                                        <Link to="#" onClick={() => setIsLogin(true)}>Iniciar Sesión</Link>
+                                        <Button variant="link" onClick={() => setIsLogin(true)}>Iniciar Sesión</Button>
                                     </p>
                                 </>
                             )}
@@ -338,10 +346,11 @@ const HomePage = () => {
     );
 };
 
-const HomePageWrapper = () => (
+// Componente Wrapper para proporcionar el contexto de autenticación
+const AppWrapper = () => (
     <AuthProvider>
-        <HomePage />
+        <App />
     </AuthProvider>
 );
 
-export default HomePageWrapper;
+export default AppWrapper;
