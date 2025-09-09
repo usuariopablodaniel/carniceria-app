@@ -168,8 +168,6 @@ const App = () => {
     // Función placeholder para el futuro reseteo de contraseña
     const handlePasswordReset = () => {
         console.log("Funcionalidad de restablecimiento de contraseña será implementada aquí.");
-        // Aquí puedes agregar la lógica para enviar un correo de reseteo,
-        // o mostrar un modal con un formulario.
     };
 
     if (loadingAuth) {
@@ -183,18 +181,43 @@ const App = () => {
     }
 
     if (isAuthenticated) {
+        // === MOSTRAR EL DASHBOARD COMPLETO ===
         return (
             <Container className="my-5">
-                <Row className="justify-content-center">
+                <Row className="justify-content-center text-center">
+                    <Col>
+                        <h1 className="text-primary mb-2">Bienvenido, {user.nombre}!</h1>
+                        <p className="lead mb-4">Tu centro de control de puntos y perfil.</p>
+                    </Col>
+                </Row>
+                <Row className="justify-content-center mb-4">
                     <Col md={8} lg={6}>
-                        <Card className="shadow-lg p-4 text-center">
+                        <Card className="shadow-lg p-4 mb-3">
                             <Card.Body>
-                                <h1 className="text-primary mb-3">Dashboard de Usuario</h1>
-                                <p className="lead">Bienvenido, {user.nombre}!</p>
-                                <p className="text-muted">Has iniciado sesión con éxito.</p>
-                                <Button variant="danger" onClick={logout}>Cerrar Sesión</Button>
+                                <h4 className="text-primary mb-2">Tus Puntos Actuales</h4>
+                                {/* Placeholder de puntos. En el futuro, usarás datos reales del usuario. */}
+                                <h1 className="text-success display-4 fw-bold mb-0">14</h1> 
+                                <p className="text-muted">¡Sigue acumulando puntos con cada compra!</p>
                             </Card.Body>
                         </Card>
+                    </Col>
+                </Row>
+                <Row className="justify-content-center mb-4">
+                    <Col md={8} lg={6}>
+                        <Card className="shadow-lg p-4">
+                            <Card.Body>
+                                <h4 className="text-primary mb-2">Tu Código QR de Usuario</h4>
+                                {/* Placeholder para el código QR */}
+                                <div className="p-4 bg-light rounded d-flex justify-content-center">
+                                    <p className="text-muted">Aquí irá el código QR</p>
+                                </div>
+                            </Card.Body>
+                        </Card>
+                    </Col>
+                </Row>
+                <Row className="justify-content-center mt-4">
+                    <Col md={8} lg={6} className="text-center">
+                        <Button variant="danger" onClick={logout}>Cerrar Sesión</Button>
                     </Col>
                 </Row>
             </Container>
@@ -244,7 +267,6 @@ const App = () => {
                                         </Form.Group>
                                         
                                         <div className="text-end mb-3">
-                                            {/* Corregido: Se usa un botón con estilo de enlace para mejorar la accesibilidad y evitar el error de eslint */}
                                             <Button variant="link" onClick={handlePasswordReset}>¿Olvidaste tu contraseña?</Button>
                                         </div>
 
