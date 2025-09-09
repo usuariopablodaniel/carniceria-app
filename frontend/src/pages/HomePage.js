@@ -1,6 +1,7 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { Container, Row, Col, Card, Form, Button, Alert, Spinner } from 'react-bootstrap';
-import 'bootstrap/dist/css/bootstrap.min.css';
+// Nota: Se asume que los archivos CSS de Bootstrap y FontAwesome
+// se cargan a través de CDN en el archivo HTML principal.
 
 // Contexto de autenticación para toda la aplicación
 const AuthContext = createContext(null);
@@ -12,8 +13,7 @@ const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
 
     useEffect(() => {
-        // Simular la verificación de autenticación. En una aplicación real,
-        // esto verificaría un token en localStorage o una sesión.
+        // Al cargar, verificar si hay un token y datos de usuario en localStorage
         const token = localStorage.getItem('token');
         if (token) {
             try {
@@ -23,8 +23,8 @@ const AuthProvider = ({ children }) => {
                     setUser(storedUser);
                 }
             } catch (e) {
-                console.error("Error parsing user from localStorage", e);
-                localStorage.clear();
+                console.error("Error al analizar el usuario desde localStorage", e);
+                localStorage.clear(); // Limpiar datos corruptos
             }
         }
         setLoadingAuth(false);
@@ -53,11 +53,10 @@ const useAuth = () => {
     return useContext(AuthContext);
 };
 
-// Componente principal de la aplicación, ahora contiene toda la lógica.
+// Componente principal de la aplicación.
 const App = () => {
     const { login, isAuthenticated, loadingAuth, user, logout } = useAuth();
     const [isLogin, setIsLogin] = useState(true);
-    const [isDashboard, setIsDashboard] = useState(false);
     const [formData, setFormData] = useState({
         email: '',
         password: '',
@@ -68,19 +67,11 @@ const App = () => {
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Reemplaza la navegación con un cambio de estado
-    useEffect(() => {
-        if (!loadingAuth && isAuthenticated) {
-            setIsDashboard(true);
-        } else {
-            setIsDashboard(false);
-        }
-    }, [isAuthenticated, loadingAuth]);
-
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
+    // Lógica de inicio de sesión replicada desde tu LoginPage.js
     const handleLoginSubmit = async (e) => {
         e.preventDefault();
         setMessage('');
@@ -92,7 +83,6 @@ const App = () => {
         try {
             if (!formData.email || !formData.password) {
                 setError('Por favor, ingresa tu email y contraseña.');
-                setIsSubmitting(false);
                 return;
             }
 
@@ -101,18 +91,23 @@ const App = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: formData.email, password: formData.password })
             });
-
+            
             const data = await response.json();
 
             if (response.ok) {
                 if (data.token && data.cliente) {
+                    // Si el login es exitoso, se llama a la función `login`
+                    // del contexto de autenticación. Esto cambia el estado
+                    // de `isAuthenticated` a `true` y el componente se re-renderiza
+                    // para mostrar el dashboard.
                     login(data.token, data.cliente);
-                    // No hay redirección, se cambia el estado del componente
                 } else {
-                    setError('Respuesta inesperada del servidor.');
+                    console.error("Respuesta exitosa del servidor sin 'token' o 'cliente'.", data);
+                    setError('Respuesta inesperada del servidor. Inténtalo de nuevo.');
                 }
             } else {
-                setError(data.error || 'Error al iniciar sesión.');
+                console.error("Error del servidor:", data);
+                setError(data.error || 'Error al iniciar sesión. Verifica tus credenciales.');
             }
         } catch (err) {
             console.error('Error de inicio de sesión:', err);
@@ -122,6 +117,7 @@ const App = () => {
         }
     };
 
+    // Función de registro de usuario
     const handleRegisterSubmit = async (e) => {
         e.preventDefault();
         setMessage('');
@@ -131,6 +127,13 @@ const App = () => {
         const API_URL = 'https://carniceria-api-vmy1.onrender.com/api/auth/register';
 
         try {
+            // Validación básica en el frontend
+            if (!formData.nombre || !formData.email || !formData.password) {
+                setError('Por favor, completa todos los campos obligatorios.');
+                setIsSubmitting(false);
+                return;
+            }
+
             const response = await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -145,7 +148,7 @@ const App = () => {
             const data = await response.json();
 
             if (response.ok) {
-                setMessage('Registro exitoso! Por favor, inicia sesión.');
+                setMessage('¡Registro exitoso! Por favor, inicia sesión.');
                 setError('');
                 setIsLogin(true);
                 setFormData({ ...formData, nombre: '', telefono: '' });
@@ -160,6 +163,7 @@ const App = () => {
         }
     };
 
+    // Redirigir para el inicio de sesión de Google
     const handleGoogleLoginRedirect = () => {
         window.location.href = 'https://carniceria-api-vmy1.onrender.com/api/auth/google';
     };
@@ -174,7 +178,10 @@ const App = () => {
         );
     }
 
-    if (isDashboard) {
+    // La lógica de "navegación" ocurre aquí:
+    // Si el usuario está autenticado, se renderiza el dashboard.
+    // De lo contrario, se renderiza el formulario de inicio de sesión/registro.
+    if (isAuthenticated) {
         return (
             <Container className="my-5">
                 <Row className="justify-content-center">
