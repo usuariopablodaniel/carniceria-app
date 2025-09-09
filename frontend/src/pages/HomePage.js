@@ -1,8 +1,6 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { Container, Row, Col, Card, Form, Button, Alert, Spinner } from 'react-bootstrap';
-
-// Note: El archivo CSS de Bootstrap debe ser cargado externamente en el HTML principal
-// a través de un enlace CDN o un archivo CSS, ya que la importación directa falló en la compilación.
+import 'bootstrap/dist/css/bootstrap.min.css';
 
 // Contexto de autenticación para toda la aplicación
 const AuthContext = createContext(null);
@@ -25,7 +23,7 @@ const AuthProvider = ({ children }) => {
                     setUser(storedUser);
                 }
             } catch (e) {
-                console.error("Error al analizar el usuario desde localStorage", e);
+                console.error("Error parsing user from localStorage", e);
                 localStorage.clear();
             }
         }
@@ -59,6 +57,7 @@ const useAuth = () => {
 const App = () => {
     const { login, isAuthenticated, loadingAuth, user, logout } = useAuth();
     const [isLogin, setIsLogin] = useState(true);
+    const [isDashboard, setIsDashboard] = useState(false);
     const [formData, setFormData] = useState({
         email: '',
         password: '',
@@ -69,11 +68,19 @@ const App = () => {
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // Reemplaza la navegación con un cambio de estado
+    useEffect(() => {
+        if (!loadingAuth && isAuthenticated) {
+            setIsDashboard(true);
+        } else {
+            setIsDashboard(false);
+        }
+    }, [isAuthenticated, loadingAuth]);
+
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    // Función de inicio de sesión con correo y contraseña
     const handleLoginSubmit = async (e) => {
         e.preventDefault();
         setMessage('');
@@ -100,13 +107,12 @@ const App = () => {
             if (response.ok) {
                 if (data.token && data.cliente) {
                     login(data.token, data.cliente);
+                    // No hay redirección, se cambia el estado del componente
                 } else {
-                    console.error("Respuesta exitosa del servidor sin 'token' o 'cliente'.", data);
-                    setError('Respuesta inesperada del servidor. Inténtalo de nuevo.');
+                    setError('Respuesta inesperada del servidor.');
                 }
             } else {
-                console.error("Error del servidor:", data);
-                setError(data.error || 'Error al iniciar sesión. Verifica tus credenciales.');
+                setError(data.error || 'Error al iniciar sesión.');
             }
         } catch (err) {
             console.error('Error de inicio de sesión:', err);
@@ -116,7 +122,6 @@ const App = () => {
         }
     };
 
-    // Función de registro de usuario
     const handleRegisterSubmit = async (e) => {
         e.preventDefault();
         setMessage('');
@@ -155,7 +160,6 @@ const App = () => {
         }
     };
 
-    // Redirigir para el inicio de sesión de Google
     const handleGoogleLoginRedirect = () => {
         window.location.href = 'https://carniceria-api-vmy1.onrender.com/api/auth/google';
     };
@@ -170,7 +174,7 @@ const App = () => {
         );
     }
 
-    if (isAuthenticated) {
+    if (isDashboard) {
         return (
             <Container className="my-5">
                 <Row className="justify-content-center">
