@@ -1,28 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // <<< CAMBIO: Se importa useEffect
 import { Container, Row, Col, Card, Form, Button, Alert, Spinner } from 'react-bootstrap';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom'; // <<< CAMBIO: Se importa useLocation
 import { useAuth } from '../context/AuthContext'; 
 import axios from '../api/axios'; 
 
 const HomePage = () => {
     const { login, isAuthenticated, loadingAuth } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation(); // <<< CAMBIO: Se añade el hook useLocation
 
-    const [isLogin, setIsLogin] = useState(true); // Controla si se muestra el formulario de login o registro
+    const [isLogin, setIsLogin] = useState(true);
     const [formData, setFormData] = useState({
         email: '',
         password: '',
-        nombre: '', // Solo para registro
-        telefono: '' // Solo para registro
+        nombre: '', 
+        telefono: '' 
     });
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // <<< CAMBIO: Se añade useEffect para manejar errores de Google Login en la URL
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const message = params.get('message');
+        if (message === 'google_login_failed') {
+          setError('Error al iniciar sesión con Google. Por favor, inténtalo de nuevo.');
+          navigate(location.pathname, { replace: true }); // Limpia la URL
+        } else if (message === 'google_parse_error') {
+          setError('Error al procesar los datos de Google. Por favor, inténtalo de nuevo.');
+          navigate(location.pathname, { replace: true }); // Limpia la URL
+        }
+    }, [location, navigate]);
+
+
     // Redireccionar si ya está autenticado
-    React.useEffect(() => {
+    useEffect(() => {
         if (!loadingAuth && isAuthenticated) {
-            navigate('/dashboard'); // Redirige al dashboard si ya inició sesión
+            navigate('/dashboard'); 
         }
     }, [isAuthenticated, loadingAuth, navigate]);
 
@@ -42,22 +57,15 @@ const HomePage = () => {
                 setIsSubmitting(false);
                 return;
             }
-
-            // >>> CAMBIO CLAVE AQUÍ: La ruta correcta es '/auth/login' <<<
             const response = await axios.post('/auth/login', {
                 email: formData.email,
                 password: formData.password
             });
-
-            // Tu backend para login tradicional envía el objeto de usuario bajo la clave 'cliente'
             if (response.data.token && response.data.cliente) {
-                // Pasamos el token y el objeto 'cliente' completo (que incluye el nombre)
                 login(response.data.token, response.data.cliente); 
             } else {
-                // Esto no debería ocurrir si el backend está bien, pero es una seguridad
                 setError('Respuesta inesperada del servidor.');
             }
-            
         } catch (err) {
             console.error('Error de inicio de sesión:', err);
             if (err.response) {
@@ -75,9 +83,7 @@ const HomePage = () => {
         setMessage('');
         setError('');
         setIsSubmitting(true);
-
         try {
-            // La ruta para el registro es '/auth/register'
             const response = await axios.post('/auth/register', {
                 nombre: formData.nombre,
                 email: formData.email,
@@ -87,35 +93,30 @@ const HomePage = () => {
             if (response.status === 201) {
                 setMessage('Registro exitoso! Por favor, inicia sesión.');
                 setError('');
-                setIsLogin(true); // Cambiar a la vista de login después del registro
-                setFormData({ ...formData, nombre: '', telefono: '' }); // Limpiar campos de registro
+                setIsLogin(true);
+                setFormData({ ...formData, nombre: '', telefono: '' });
             } else {
                 setError(response.data.error || 'Error desconocido durante el registro.');
             }
         } catch (err) {
             console.error('Error de registro:', err);
             if (err.response) {
-                setError(err.response.data.error || 'Error al registrar usuario (respuesta del servidor).');
-            } else if (err.request) {
-                setError('No se pudo conectar con el servidor. Intenta de nuevo más tarde.');
+                setError(err.response.data.error || 'Error al registrar usuario.');
             } else {
-                setError('Ocurrió un error inesperado al procesar la solicitud.');
+                setError('No se pudo conectar con el servidor.');
             }
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    const handleGoogleLogin = () => {
-        // Asegúrate de que REACT_APP_API_URL no termine en /api
-        // Si termina en /api, entonces deberías usar `${process.env.REACT_APP_API_URL}/auth/google`
-        // Si no termina en /api, entonces `${process.env.REACT_APP_API_URL}/api/auth/google`
-        window.location.href = `${process.env.REACT_APP_API_URL}/api/auth/google`;
+    // <<< CAMBIO CLAVE: Se usa la misma función y URL que en LoginPage.js
+    const handleGoogleLoginRedirect = () => {
+        window.location.href = 'https://carniceria-api-vmy1.onrender.com/api/auth/google';
     };
 
-    // Si ya está autenticado y cargado, no mostrar el formulario, se redirigirá.
     if (!loadingAuth && isAuthenticated) {
-        return null; // O un spinner si la redirección tarda
+        return null; 
     }
 
     return (
@@ -129,7 +130,7 @@ const HomePage = () => {
                                 Tu puerta de entrada a las mejores carnes y beneficios exclusivos.
                             </p>
 
-                            {loadingAuth && ( // Mostrar spinner mientras AuthContext está cargando
+                            {loadingAuth && (
                                 <div className="text-center mb-3">
                                     <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
                                     <p className="d-inline">Cargando sesión...</p>
@@ -145,51 +146,19 @@ const HomePage = () => {
                                     <Form onSubmit={handleLoginSubmit}>
                                         <Form.Group className="mb-3" controlId="emailLogin">
                                             <Form.Label>Correo Electrónico</Form.Label>
-                                            <Form.Control
-                                                type="email"
-                                                name="email"
-                                                value={formData.email}
-                                                onChange={handleChange}
-                                                placeholder="tu@ejemplo.com"
-                                                required
-                                            />
+                                            <Form.Control type="email" name="email" value={formData.email} onChange={handleChange} placeholder="tu@ejemplo.com" required />
                                         </Form.Group>
-
                                         <Form.Group className="mb-3" controlId="passwordLogin">
                                             <Form.Label>Contraseña</Form.Label>
-                                            <Form.Control
-                                                type="password"
-                                                name="password"
-                                                value={formData.password}
-                                                onChange={handleChange}
-                                                placeholder="Tu contraseña"
-                                                required
-                                            />
+                                            <Form.Control type="password" name="password" value={formData.password} onChange={handleChange} placeholder="Tu contraseña" required />
                                         </Form.Group>
-
-                                        <Button 
-                                            variant="primary" 
-                                            type="submit" 
-                                            className="w-100 mb-3" 
-                                            disabled={isSubmitting || loadingAuth}
-                                        >
-                                            {isSubmitting ? (
-                                                <>
-                                                    <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
-                                                    Iniciando...
-                                                </>
-                                            ) : (
-                                                'Iniciar Sesión'
-                                            )}
+                                        <Button variant="primary" type="submit" className="w-100 mb-3" disabled={isSubmitting || loadingAuth}>
+                                            {isSubmitting ? <><Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />Iniciando...</> : 'Iniciar Sesión'}
                                         </Button>
                                     </Form>
-                                    <Button 
-                                        variant="outline-danger" 
-                                        onClick={handleGoogleLogin} 
-                                        className="w-100 mb-3 d-flex align-items-center justify-content-center"
-                                        disabled={isSubmitting || loadingAuth}
-                                    >
-                                        <i className="fab fa-google me-2"></i> {/* Asegúrate de tener Font Awesome si usas esto */}
+                                    {/* <<< CAMBIO: El onClick ahora llama a la función correcta */}
+                                    <Button variant="outline-danger" onClick={handleGoogleLoginRedirect} className="w-100 mb-3 d-flex align-items-center justify-content-center" disabled={isSubmitting || loadingAuth}>
+                                        <i className="fab fa-google me-2"></i>
                                         Iniciar Sesión con Google
                                     </Button>
                                     <p className="text-center">
@@ -203,65 +172,22 @@ const HomePage = () => {
                                     <Form onSubmit={handleRegisterSubmit}>
                                         <Form.Group className="mb-3" controlId="nombreRegister">
                                             <Form.Label>Nombre Completo</Form.Label>
-                                            <Form.Control
-                                                type="text"
-                                                name="nombre"
-                                                value={formData.nombre}
-                                                onChange={handleChange}
-                                                placeholder="Tu nombre"
-                                                required
-                                            />
+                                            <Form.Control type="text" name="nombre" value={formData.nombre} onChange={handleChange} placeholder="Tu nombre" required />
                                         </Form.Group>
-
                                         <Form.Group className="mb-3" controlId="emailRegister">
                                             <Form.Label>Correo Electrónico</Form.Label>
-                                            <Form.Control
-                                                type="email"
-                                                name="email"
-                                                value={formData.email}
-                                                onChange={handleChange}
-                                                placeholder="tu@ejemplo.com"
-                                                required
-                                            />
+                                            <Form.Control type="email" name="email" value={formData.email} onChange={handleChange} placeholder="tu@ejemplo.com" required />
                                         </Form.Group>
-
                                         <Form.Group className="mb-3" controlId="passwordRegister">
                                             <Form.Label>Contraseña</Form.Label>
-                                            <Form.Control
-                                                type="password"
-                                                name="password"
-                                                value={formData.password}
-                                                onChange={handleChange}
-                                                placeholder="Crea una contraseña"
-                                                required
-                                            />
+                                            <Form.Control type="password" name="password" value={formData.password} onChange={handleChange} placeholder="Crea una contraseña" required />
                                         </Form.Group>
-
                                         <Form.Group className="mb-3" controlId="telefonoRegister">
                                             <Form.Label>Teléfono (Opcional)</Form.Label>
-                                            <Form.Control
-                                                type="tel"
-                                                name="telefono"
-                                                value={formData.telefono}
-                                                onChange={handleChange}
-                                                placeholder="Ej: +5491112345678"
-                                            />
+                                            <Form.Control type="tel" name="telefono" value={formData.telefono} onChange={handleChange} placeholder="Ej: +5491112345678" />
                                         </Form.Group>
-
-                                        <Button 
-                                            variant="success" 
-                                            type="submit" 
-                                            className="w-100 mb-3" 
-                                            disabled={isSubmitting || loadingAuth}
-                                        >
-                                            {isSubmitting ? (
-                                                <>
-                                                    <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
-                                                    Registrando...
-                                                </>
-                                            ) : (
-                                                'Registrarse'
-                                            )}
+                                        <Button variant="success" type="submit" className="w-100 mb-3" disabled={isSubmitting || loadingAuth}>
+                                            {isSubmitting ? <><Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />Registrando...</> : 'Registrarse'}
                                         </Button>
                                     </Form>
                                     <p className="text-center">
