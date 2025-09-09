@@ -9,9 +9,12 @@ const UserManagementPage = () => {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [searchTerm, setSearchTerm] = useState(''); // Estado para el término de búsqueda
+    
+    // <<< CAMBIO: Estados para el nuevo modal de la lista completa >>>
+    const [showAllUsersModal, setShowAllUsersModal] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
 
-    // Estados para el modal de edición
+    // Estados para el modal de edición (sin cambios)
     const [showEditModal, setShowEditModal] = useState(false);
     const [currentUserToEdit, setCurrentUserToEdit] = useState(null);
     const [newRole, setNewRole] = useState('');
@@ -19,12 +22,11 @@ const UserManagementPage = () => {
     // Función para formatear la fecha (DD/MM/YYYY)
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
-        
         try {
             const date = new Date(dateString);
             return date.toLocaleDateString('es-ES');
         } catch (error) {
-            console.error("Error formatting date:", error); // Mantener para errores de formato
+            console.error("Error formatting date:", error);
             return 'Invalid Date';
         }
     };
@@ -42,6 +44,7 @@ const UserManagementPage = () => {
             setLoading(true);
             setError(null);
             const response = await api.get('/auth/users');
+            // Filtra para no mostrar el admin actual en la lista
             const filteredUsers = response.data.users.filter(u => u.id !== user.id);
             setUsers(filteredUsers);
             setLoading(false);
@@ -74,38 +77,35 @@ const UserManagementPage = () => {
             handleCloseEditModal();
             return;
         }
-
         try {
-            await api.put(
-                `/auth/users/${currentUserToEdit.id}`,
-                { role: newRole }
-            );
+            await api.put(`/auth/users/${currentUserToEdit.id}`, { role: newRole });
             handleCloseEditModal();
             fetchUsers();
         } catch (err) {
             console.error('Error al actualizar rol:', err.response?.data || err.message);
-            setError('Error al actualizar el rol del usuario: ' + (err.response?.data?.error || err.message || 'Error desconocido'));
+            setError('Error al actualizar el rol del usuario: ' + (err.response?.data?.error || 'Error desconocido'));
         }
     };
 
     // --- Funciones para Eliminar Usuario ---
     const handleDeleteUser = async (userId, userName) => {
-        // >>>>>>>>>>>>>>> NOTA: window.confirm no funciona en entornos de iFrame. <<<<<<<<<<<<<<<<
-        // Para una aplicación en producción, deberías reemplazar esto con un modal de confirmación personalizado.
+        // NOTA: Se recomienda reemplazar window.confirm con un modal de confirmación personalizado.
         if (window.confirm(`¿Estás seguro de que deseas eliminar al usuario ${userName}? Esta acción no se puede deshacer.`)) {
             try {
-                await api.delete(
-                    `/auth/users/${userId}`
-                );
+                await api.delete(`/auth/users/${userId}`);
                 fetchUsers();
+                 // Si el usuario está en el modal de edición, cerrarlo
+                if(currentUserToEdit && currentUserToEdit.id === userId) {
+                    handleCloseEditModal();
+                }
             } catch (err) {
                 console.error('Error al eliminar usuario:', err.response?.data || err.message);
-                setError('Error al eliminar el usuario: ' + (err.response?.data?.error || err.message || 'Error desconocido'));
+                setError('Error al eliminar el usuario: ' + (err.response?.data?.error || 'Error desconocido'));
             }
         }
     };
 
-    // --- Lógica para el buscador ---
+    // --- Lógica para el buscador (se usará en el modal) ---
     const filteredUsers = users.filter(u =>
         (u.nombre && u.nombre.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (u.email && u.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -131,102 +131,94 @@ const UserManagementPage = () => {
         return <Alert variant="danger" className="mt-5">{error}</Alert>;
     }
 
+    // <<< CAMBIO: Se encapsula la tabla en una función para reutilizarla en el modal >>>
+    const renderUsersTable = (userList) => (
+        <Table striped bordered hover responsive>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nombre</th>
+                    <th>Email</th>
+                    <th>Rol</th>
+                    <th>Puntos</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {userList.map(u => (
+                    <tr key={u.id}>
+                        <td>{u.id}</td>
+                        <td>{u.nombre}</td>
+                        <td>{u.email}</td>
+                        <td>{u.role}</td>
+                        <td>{u.puntos_actuales}</td>
+                        <td>
+                            <Button variant="warning" size="sm" className="me-2" onClick={() => handleEditClick(u)}>
+                                Editar
+                            </Button>
+                            <Button variant="danger" size="sm" onClick={() => handleDeleteUser(u.id, u.nombre)}>
+                                Eliminar
+                            </Button>
+                        </td>
+                    </tr>
+                ))}
+            </tbody>
+        </Table>
+    );
+
+
     return (
         <Container className="mt-5">
             <h1 className="mb-4">Gestión de Usuarios</h1>
+            
+            <p>Mostrando los primeros 10 usuarios. Para ver la lista completa, haz clic en el botón.</p>
+            
+            {/* <<< CAMBIO: La tabla principal ahora muestra solo los primeros 10 usuarios >>> */}
+            {users.length > 0 ? (
+                renderUsersTable(users.slice(0, 10))
+            ) : (
+                <Alert variant="info">No hay usuarios para mostrar.</Alert>
+            )}
 
-            {/* Componente del Buscador */}
-            <Form.Group className="mb-4">
-                <Form.Control
-                    type="text"
-                    placeholder="Buscar por nombre, email o ID..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                />
-            </Form.Group>
+            {/* <<< CAMBIO: Botón para abrir el modal con la lista completa >>> */}
+            <Button variant="primary" onClick={() => setShowAllUsersModal(true)} className="mt-3">
+                Ver todos los usuarios ({users.length})
+            </Button>
+            
+            {/* ------------------------------------------------------------------ */}
+            {/* <<< CAMBIO: Nuevo Modal para mostrar TODOS los usuarios y buscar >>> */}
+            <Modal show={showAllUsersModal} onHide={() => setShowAllUsersModal(false)} size="xl" centered>
+                <Modal.Header closeButton>
+                    <Modal.Title>Lista Completa de Usuarios</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <Form.Group className="mb-4">
+                        <Form.Control
+                            type="text"
+                            placeholder="Buscar por nombre, email o ID..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </Form.Group>
 
-            {/* Vista para pantallas grandes (Tabla) */}
-            <div className="d-none d-md-block"> {/* Oculta en pantallas pequeñas, visible en medianas y grandes */}
-                {filteredUsers.length === 0 ? (
-                    <Alert variant="info">No se encontraron usuarios que coincidan con la búsqueda.</Alert>
-                ) : (
-                    <Table striped bordered hover responsive>
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Nombre</th>
-                                <th>Email</th>
-                                <th>Teléfono</th>
-                                <th>Rol</th>
-                                <th>Puntos</th>
-                                <th>Registro</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredUsers.map(u => (
-                                <tr key={u.id}>
-                                    <td>{u.id}</td>
-                                    <td>{u.nombre}</td>
-                                    <td>{u.email}</td>
-                                    <td>{u.telefono || 'N/A'}</td>
-                                    <td>{u.role}</td>
-                                    <td>{u.puntos_actuales}</td>
-                                    <td>{formatDate(u.fecha_registro)}</td> 
-                                    <td>
-                                        <Button 
-                                            variant="warning" 
-                                            size="sm" 
-                                            className="me-2"
-                                            onClick={() => handleEditClick(u)} 
-                                        >
-                                            Editar Rol
-                                        </Button>
-                                        <Button 
-                                            variant="danger" 
-                                            size="sm"
-                                            onClick={() => handleDeleteUser(u.id, u.nombre)} 
-                                        >
-                                            Eliminar
-                                        </Button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </Table>
-                )}
-            </div>
+                    {filteredUsers.length === 0 ? (
+                        <Alert variant="info">No se encontraron usuarios que coincidan con la búsqueda.</Alert>
+                    ) : (
+                        renderUsersTable(filteredUsers)
+                    )}
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowAllUsersModal(false)}>
+                        Cerrar
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+            {/* ------------------------------------------------------------------ */}
 
-            {/* Vista para pantallas pequeñas (Tarjetas) */}
-            <div className="d-md-none"> {/* Visible solo en pantallas pequeñas */}
-                {filteredUsers.length === 0 ? (
-                    <Alert variant="info">No se encontraron usuarios que coincidan con la búsqueda.</Alert>
-                ) : (
-                    <Row xs={1} className="g-4">
-                        {filteredUsers.map(u => (
-                            <Col key={u.id}>
-                                <Card onClick={() => handleEditClick(u)} style={{ cursor: 'pointer' }}>
-                                    <Card.Body>
-                                        <Card.Title>{u.nombre}</Card.Title>
-                                        <Card.Subtitle className="mb-2 text-muted">ID: {u.id}</Card.Subtitle>
-                                        <Card.Text>
-                                            <strong>Email:</strong> {u.email}<br />
-                                            <strong>Rol:</strong> {u.role}<br />
-                                            <strong>Puntos:</strong> {u.puntos_actuales}<br />
-                                            <strong>Registro:</strong> {formatDate(u.fecha_registro)}
-                                        </Card.Text>
-                                    </Card.Body>
-                                </Card>
-                            </Col>
-                        ))}
-                    </Row>
-                )}
-            </div>
-
-            {/* Modal para Editar Rol - Ahora también sirve para pantallas pequeñas */}
+            {/* Modal para Editar Rol (código sin cambios significativos) */}
             <Modal show={showEditModal} onHide={handleCloseEditModal}>
                 <Modal.Header closeButton>
-                    <Modal.Title>Detalles y Acciones para {currentUserToEdit?.nombre}</Modal.Title>
+                    <Modal.Title>Detalles de {currentUserToEdit?.nombre}</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
                     <p><strong>ID:</strong> {currentUserToEdit?.id}</p>
@@ -235,11 +227,7 @@ const UserManagementPage = () => {
                     <hr />
                     <Form.Group>
                         <Form.Label>Selecciona Nuevo Rol:</Form.Label>
-                        <Form.Control
-                            as="select"
-                            value={newRole}
-                            onChange={(e) => setNewRole(e.target.value)}
-                        >
+                        <Form.Control as="select" value={newRole} onChange={(e) => setNewRole(e.target.value)}>
                             <option value="user">Usuario (user)</option>
                             <option value="admin">Administrador (admin)</option>
                             <option value="employee">Empleado (employee)</option>
@@ -253,11 +241,7 @@ const UserManagementPage = () => {
                     <Button variant="warning" onClick={handleUpdateRole}>
                         Guardar Rol
                     </Button>
-                    <Button 
-                        variant="danger" 
-                        onClick={() => handleDeleteUser(currentUserToEdit?.id, currentUserToEdit?.nombre)}
-                        className="ms-auto"
-                    >
+                    <Button variant="danger" className="ms-auto" onClick={() => handleDeleteUser(currentUserToEdit?.id, currentUserToEdit?.nombre)}>
                         Eliminar Usuario
                     </Button>
                 </Modal.Footer>
