@@ -55,7 +55,7 @@ const useAuth = () => {
 
 // Componente principal de la aplicación.
 const App = () => {
-    const { login, isAuthenticated, loadingAuth, user, logout } = useAuth();
+    // Definimos el estado para el formulario
     const [isLogin, setIsLogin] = useState(true);
     const [formData, setFormData] = useState({
         email: '',
@@ -67,11 +67,14 @@ const App = () => {
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // Contexto y hook para manejar la autenticación
+    const { login, isAuthenticated, loadingAuth, user, logout } = useAuth();
+
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    // Lógica de inicio de sesión replicada desde tu LoginPage.js
+    // Lógica de inicio de sesión
     const handleLoginSubmit = async (e) => {
         e.preventDefault();
         setMessage('');
@@ -91,15 +94,11 @@ const App = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: formData.email, password: formData.password })
             });
-            
+
             const data = await response.json();
 
             if (response.ok) {
                 if (data.token && data.cliente) {
-                    // Si el login es exitoso, se llama a la función `login`
-                    // del contexto de autenticación. Esto cambia el estado
-                    // de `isAuthenticated` a `true` y el componente se re-renderiza
-                    // para mostrar el dashboard.
                     login(data.token, data.cliente);
                 } else {
                     console.error("Respuesta exitosa del servidor sin 'token' o 'cliente'.", data);
@@ -127,10 +126,8 @@ const App = () => {
         const API_URL = 'https://carniceria-api-vmy1.onrender.com/api/auth/register';
 
         try {
-            // Validación básica en el frontend
             if (!formData.nombre || !formData.email || !formData.password) {
                 setError('Por favor, completa todos los campos obligatorios.');
-                setIsSubmitting(false);
                 return;
             }
 
@@ -168,6 +165,13 @@ const App = () => {
         window.location.href = 'https://carniceria-api-vmy1.onrender.com/api/auth/google';
     };
 
+    // Función placeholder para el futuro reseteo de contraseña
+    const handlePasswordReset = () => {
+        console.log("Funcionalidad de restablecimiento de contraseña será implementada aquí.");
+        // Aquí puedes agregar la lógica para enviar un correo de reseteo,
+        // o mostrar un modal con un formulario.
+    };
+
     if (loadingAuth) {
         return (
             <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh' }}>
@@ -178,9 +182,6 @@ const App = () => {
         );
     }
 
-    // La lógica de "navegación" ocurre aquí:
-    // Si el usuario está autenticado, se renderiza el dashboard.
-    // De lo contrario, se renderiza el formulario de inicio de sesión/registro.
     if (isAuthenticated) {
         return (
             <Container className="my-5">
@@ -241,6 +242,11 @@ const App = () => {
                                                 required
                                             />
                                         </Form.Group>
+                                        
+                                        <div className="text-end mb-3">
+                                            {/* Corregido: Se usa un botón con estilo de enlace para mejorar la accesibilidad y evitar el error de eslint */}
+                                            <Button variant="link" onClick={handlePasswordReset}>¿Olvidaste tu contraseña?</Button>
+                                        </div>
 
                                         <Button
                                             variant="primary"
@@ -258,6 +264,7 @@ const App = () => {
                                             )}
                                         </Button>
                                     </Form>
+
                                     <Button
                                         variant="outline-danger"
                                         onClick={handleGoogleLoginRedirect}
