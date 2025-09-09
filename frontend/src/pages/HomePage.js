@@ -1,227 +1,121 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState } from 'react';
 import { Container, Row, Col, Card, Form, Button, Alert, Spinner } from 'react-bootstrap';
-// Nota: Se asume que los archivos CSS de Bootstrap y FontAwesome
-// se cargan a través de CDN en el archivo HTML principal.
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext'; 
+import axios from '../api/axios'; 
 
-// Contexto de autenticación para toda la aplicación
-const AuthContext = createContext(null);
+const HomePage = () => {
+    const { login, isAuthenticated, loadingAuth } = useAuth();
+    const navigate = useNavigate();
 
-// Proveedor de autenticación que maneja el estado de inicio de sesión
-const AuthProvider = ({ children }) => {
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [loadingAuth, setLoadingAuth] = useState(true);
-    const [user, setUser] = useState(null);
-
-    useEffect(() => {
-        // Al cargar, verificar si hay un token y datos de usuario en localStorage
-        const token = localStorage.getItem('token');
-        if (token) {
-            try {
-                const storedUser = JSON.parse(localStorage.getItem('user'));
-                if (storedUser) {
-                    setIsAuthenticated(true);
-                    setUser(storedUser);
-                }
-            } catch (e) {
-                console.error("Error al analizar el usuario desde localStorage", e);
-                localStorage.clear(); // Limpiar datos corruptos
-            }
-        }
-        setLoadingAuth(false);
-    }, []);
-
-    const login = (token, userData) => {
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(userData));
-        setIsAuthenticated(true);
-        setUser(userData);
-    };
-
-    const logout = () => {
-        localStorage.clear();
-        setIsAuthenticated(false);
-        setUser(null);
-    };
-
-    const value = { isAuthenticated, loadingAuth, user, login, logout };
-
-    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
-
-// Hook personalizado para usar el contexto de autenticación
-const useAuth = () => {
-    return useContext(AuthContext);
-};
-
-// Componente principal de la aplicación.
-const App = () => {
-    // Definimos el estado para el formulario
-    const [isLogin, setIsLogin] = useState(true);
+    const [isLogin, setIsLogin] = useState(true); // Controla si se muestra el formulario de login o registro
     const [formData, setFormData] = useState({
         email: '',
         password: '',
-        nombre: '',
-        telefono: ''
+        nombre: '', // Solo para registro
+        telefono: '' // Solo para registro
     });
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Contexto y hook para manejar la autenticación
-    const { login, isAuthenticated, loadingAuth, user, logout } = useAuth();
+    // Redireccionar si ya está autenticado
+    React.useEffect(() => {
+        if (!loadingAuth && isAuthenticated) {
+            navigate('/dashboard'); // Redirige al dashboard si ya inició sesión
+        }
+    }, [isAuthenticated, loadingAuth, navigate]);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    // Lógica de inicio de sesión
     const handleLoginSubmit = async (e) => {
         e.preventDefault();
         setMessage('');
         setError('');
         setIsSubmitting(true);
 
-        const API_URL = 'https://carniceria-api-vmy1.onrender.com/api/auth/login';
-
         try {
             if (!formData.email || !formData.password) {
                 setError('Por favor, ingresa tu email y contraseña.');
+                setIsSubmitting(false);
                 return;
             }
 
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: formData.email, password: formData.password })
+            // >>> CAMBIO CLAVE AQUÍ: La ruta correcta es '/auth/login' <<<
+            const response = await axios.post('/auth/login', {
+                email: formData.email,
+                password: formData.password
             });
 
-            const data = await response.json();
-
-            if (response.ok) {
-                if (data.token && data.cliente) {
-                    login(data.token, data.cliente);
-                } else {
-                    console.error("Respuesta exitosa del servidor sin 'token' o 'cliente'.", data);
-                    setError('Respuesta inesperada del servidor. Inténtalo de nuevo.');
-                }
+            // Tu backend para login tradicional envía el objeto de usuario bajo la clave 'cliente'
+            if (response.data.token && response.data.cliente) {
+                // Pasamos el token y el objeto 'cliente' completo (que incluye el nombre)
+                login(response.data.token, response.data.cliente); 
             } else {
-                console.error("Error del servidor:", data);
-                setError(data.error || 'Error al iniciar sesión. Verifica tus credenciales.');
+                // Esto no debería ocurrir si el backend está bien, pero es una seguridad
+                setError('Respuesta inesperada del servidor.');
             }
+            
         } catch (err) {
             console.error('Error de inicio de sesión:', err);
-            setError('No se pudo conectar con el servidor. Intenta de nuevo más tarde.');
+            if (err.response) {
+                setError(err.response.data.error || 'Error al iniciar sesión.');
+            } else {
+                setError('No se pudo conectar con el servidor. Intenta de nuevo más tarde.');
+            }
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    // Función de registro de usuario
     const handleRegisterSubmit = async (e) => {
         e.preventDefault();
         setMessage('');
         setError('');
         setIsSubmitting(true);
 
-        const API_URL = 'https://carniceria-api-vmy1.onrender.com/api/auth/register';
-
         try {
-            if (!formData.nombre || !formData.email || !formData.password) {
-                setError('Por favor, completa todos los campos obligatorios.');
-                return;
-            }
-
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    nombre: formData.nombre,
-                    email: formData.email,
-                    password: formData.password,
-                    telefono: formData.telefono
-                })
+            // La ruta para el registro es '/auth/register'
+            const response = await axios.post('/auth/register', {
+                nombre: formData.nombre,
+                email: formData.email,
+                password: formData.password,
+                telefono: formData.telefono 
             });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                setMessage('¡Registro exitoso! Por favor, inicia sesión.');
+            if (response.status === 201) {
+                setMessage('Registro exitoso! Por favor, inicia sesión.');
                 setError('');
-                setIsLogin(true);
-                setFormData({ ...formData, nombre: '', telefono: '' });
+                setIsLogin(true); // Cambiar a la vista de login después del registro
+                setFormData({ ...formData, nombre: '', telefono: '' }); // Limpiar campos de registro
             } else {
-                setError(data.error || 'Error desconocido durante el registro.');
+                setError(response.data.error || 'Error desconocido durante el registro.');
             }
         } catch (err) {
             console.error('Error de registro:', err);
-            setError('No se pudo conectar con el servidor. Intenta de nuevo más tarde.');
+            if (err.response) {
+                setError(err.response.data.error || 'Error al registrar usuario (respuesta del servidor).');
+            } else if (err.request) {
+                setError('No se pudo conectar con el servidor. Intenta de nuevo más tarde.');
+            } else {
+                setError('Ocurrió un error inesperado al procesar la solicitud.');
+            }
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    // Redirigir para el inicio de sesión de Google
-    const handleGoogleLoginRedirect = () => {
-        window.location.href = 'https://carniceria-api-vmy1.onrender.com/api/auth/google';
+    const handleGoogleLogin = () => {
+        // Asegúrate de que REACT_APP_API_URL no termine en /api
+        // Si termina en /api, entonces deberías usar `${process.env.REACT_APP_API_URL}/auth/google`
+        // Si no termina en /api, entonces `${process.env.REACT_APP_API_URL}/api/auth/google`
+        window.location.href = `${process.env.REACT_APP_API_URL}/api/auth/google`;
     };
 
-    // Función placeholder para el futuro reseteo de contraseña
-    const handlePasswordReset = () => {
-        console.log("Funcionalidad de restablecimiento de contraseña será implementada aquí.");
-    };
-
-    if (loadingAuth) {
-        return (
-            <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh' }}>
-                <Spinner animation="border" role="status">
-                    <span className="visually-hidden">Cargando...</span>
-                </Spinner>
-            </div>
-        );
-    }
-
-    if (isAuthenticated) {
-        // === MOSTRAR EL DASHBOARD COMPLETO ===
-        return (
-            <Container className="my-5">
-                <Row className="justify-content-center text-center">
-                    <Col>
-                        <h1 className="text-primary mb-2">Bienvenido, {user.nombre}!</h1>
-                        <p className="lead mb-4">Tu centro de control de puntos y perfil.</p>
-                    </Col>
-                </Row>
-                <Row className="justify-content-center mb-4">
-                    <Col md={8} lg={6}>
-                        <Card className="shadow-lg p-4 mb-3">
-                            <Card.Body>
-                                <h4 className="text-primary mb-2">Tus Puntos Actuales</h4>
-                                {/* Placeholder de puntos. En el futuro, usarás datos reales del usuario. */}
-                                <h1 className="text-success display-4 fw-bold mb-0">14</h1> 
-                                <p className="text-muted">¡Sigue acumulando puntos con cada compra!</p>
-                            </Card.Body>
-                        </Card>
-                    </Col>
-                </Row>
-                <Row className="justify-content-center mb-4">
-                    <Col md={8} lg={6}>
-                        <Card className="shadow-lg p-4">
-                            <Card.Body>
-                                <h4 className="text-primary mb-2">Tu Código QR de Usuario</h4>
-                                {/* Placeholder para el código QR */}
-                                <div className="p-4 bg-light rounded d-flex justify-content-center">
-                                    <p className="text-muted">Aquí irá el código QR</p>
-                                </div>
-                            </Card.Body>
-                        </Card>
-                    </Col>
-                </Row>
-                <Row className="justify-content-center mt-4">
-                    <Col md={8} lg={6} className="text-center">
-                        <Button variant="danger" onClick={logout}>Cerrar Sesión</Button>
-                    </Col>
-                </Row>
-            </Container>
-        );
+    // Si ya está autenticado y cargado, no mostrar el formulario, se redirigirá.
+    if (!loadingAuth && isAuthenticated) {
+        return null; // O un spinner si la redirección tarda
     }
 
     return (
@@ -234,6 +128,13 @@ const App = () => {
                             <p className="text-center text-muted mb-4">
                                 Tu puerta de entrada a las mejores carnes y beneficios exclusivos.
                             </p>
+
+                            {loadingAuth && ( // Mostrar spinner mientras AuthContext está cargando
+                                <div className="text-center mb-3">
+                                    <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
+                                    <p className="d-inline">Cargando sesión...</p>
+                                </div>
+                            )}
 
                             {error && <Alert variant="danger" onClose={() => setError('')} dismissible>{error}</Alert>}
                             {message && <Alert variant="success" onClose={() => setMessage('')} dismissible>{message}</Alert>}
@@ -265,15 +166,11 @@ const App = () => {
                                                 required
                                             />
                                         </Form.Group>
-                                        
-                                        <div className="text-end mb-3">
-                                            <Button variant="link" onClick={handlePasswordReset}>¿Olvidaste tu contraseña?</Button>
-                                        </div>
 
-                                        <Button
-                                            variant="primary"
-                                            type="submit"
-                                            className="w-100 mb-3"
+                                        <Button 
+                                            variant="primary" 
+                                            type="submit" 
+                                            className="w-100 mb-3" 
                                             disabled={isSubmitting || loadingAuth}
                                         >
                                             {isSubmitting ? (
@@ -286,19 +183,18 @@ const App = () => {
                                             )}
                                         </Button>
                                     </Form>
-
-                                    <Button
-                                        variant="outline-danger"
-                                        onClick={handleGoogleLoginRedirect}
+                                    <Button 
+                                        variant="outline-danger" 
+                                        onClick={handleGoogleLogin} 
                                         className="w-100 mb-3 d-flex align-items-center justify-content-center"
                                         disabled={isSubmitting || loadingAuth}
                                     >
-                                        <i className="fab fa-google me-2"></i>
+                                        <i className="fab fa-google me-2"></i> {/* Asegúrate de tener Font Awesome si usas esto */}
                                         Iniciar Sesión con Google
                                     </Button>
                                     <p className="text-center">
                                         ¿No tienes una cuenta?{' '}
-                                        <Button variant="link" onClick={() => setIsLogin(false)}>Regístrate aquí</Button>
+                                        <Link to="#" onClick={() => setIsLogin(false)}>Regístrate aquí</Link>
                                     </p>
                                 </>
                             ) : (
@@ -352,10 +248,10 @@ const App = () => {
                                             />
                                         </Form.Group>
 
-                                        <Button
-                                            variant="success"
-                                            type="submit"
-                                            className="w-100 mb-3"
+                                        <Button 
+                                            variant="success" 
+                                            type="submit" 
+                                            className="w-100 mb-3" 
                                             disabled={isSubmitting || loadingAuth}
                                         >
                                             {isSubmitting ? (
@@ -370,7 +266,7 @@ const App = () => {
                                     </Form>
                                     <p className="text-center">
                                         ¿Ya tienes una cuenta?{' '}
-                                        <Button variant="link" onClick={() => setIsLogin(true)}>Iniciar Sesión</Button>
+                                        <Link to="#" onClick={() => setIsLogin(true)}>Iniciar Sesión</Link>
                                     </p>
                                 </>
                             )}
@@ -382,11 +278,4 @@ const App = () => {
     );
 };
 
-// Componente Wrapper para proporcionar el contexto de autenticación
-const AppWrapper = () => (
-    <AuthProvider>
-        <App />
-    </AuthProvider>
-);
-
-export default AppWrapper;
+export default HomePage;
