@@ -1,6 +1,5 @@
-// frontend/src/components/AppNavbar.js
 import React, { useState } from 'react';
-import { Navbar, Nav, Button, Container, NavbarText } from 'react-bootstrap';
+import { Navbar, Nav, Button, Container } from 'react-bootstrap';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -25,7 +24,7 @@ const AppNavbar = () => {
         if (navigator.share) {
             try {
                 await navigator.share({
-                    title: 'Carnicería 9 de Julio App',
+                    title: 'Carniceria 9 de Julio App',
                     text: '¡Descarga nuestra app y haz tus pedidos fácilmente!',
                     url: 'https://carniceria9dejulio.netlify.app'
                 });
@@ -48,38 +47,51 @@ const AppNavbar = () => {
                 </Navbar.Brand>
 
                 <Navbar.Toggle aria-controls="basic-navbar-nav" onClick={() => setShowMenu(!showMenu)} />
-
-                <Navbar.Collapse id="basic-navbar-nav" className="justify-content-center">
-                    <Nav className="mx-auto"> {/* mx-auto centra los enlaces principales */}
+                
+                <Navbar.Collapse id="basic-navbar-nav">
+                    <Nav className="me-auto">
                         <Nav.Link as={NavLink} to="/products" className="text-white" onClick={closeMenu}>Ofertas</Nav.Link>
+                        
                         <Nav.Link as={NavLink} to="/redemption-products" className="text-white" onClick={closeMenu}>Canje por Puntos</Nav.Link>
+                        
+                        {/* Enlace "Añadir Producto" - Visible SOLO para ADMINISTRADORES */}
                         {isAdmin && (
                             <Nav.Link as={NavLink} to="/products/add" className="text-white" onClick={closeMenu}>Añadir Producto</Nav.Link>
                         )}
+                        
+                        {/* Enlace "Escanear QR" - Visible para ADMINISTRADORES o EMPLEADOS */}
                         {(isAdmin || isEmployee) && (
                             <Nav.Link as={NavLink} to="/scan-qr" className="text-white" onClick={closeMenu}>Escanear QR</Nav.Link>
                         )}
+                        
+                        {/* Enlace de Gestión de Usuarios (SOLO ADMIN) */}
                         {isAdmin && (
                             <Nav.Link as={NavLink} to="/users" className="text-white" onClick={closeMenu}>Gestión de Usuarios</Nav.Link>
                         )}
+
+                        {/* Enlace al Dashboard, visible para cualquier usuario autenticado */}
                         {isAuthenticated && (
                             <Nav.Link as={NavLink} to="/dashboard" className="text-white" onClick={closeMenu}>Dashboard</Nav.Link>
                         )}
                     </Nav>
-
-                    <Nav className="ms-auto"> {/* ms-auto empuja estos enlaces a la derecha */}
+                    <Nav>
+                        {/* Enlaces de información y política de privacidad */}
                         <Nav.Link as={NavLink} to="/contact" className="text-white" onClick={closeMenu}>Contacto</Nav.Link>
+                        
+                        {/* Botón de compartir, visible solo si el navegador lo soporta */}
                         {navigator.share && (
-                            <Nav.Link as="button" onClick={handleShare} className="text-white">Compartir App</Nav.Link>
+                           <Nav.Link as="button" onClick={handleShare} className="text-white">Compartir App</Nav.Link>
                         )}
+                        
                         <Nav.Link as={NavLink} to="/politica-de-privacidad.html" className="text-white" onClick={closeMenu}>Política de Privacidad</Nav.Link>
                         <Nav.Link as={NavLink} to="/terminos-de-servicio.html" className="text-white" onClick={closeMenu}>Condiciones del Servicio</Nav.Link>
-
+                        
+                        {/* Botones de autenticación */}
                         {isAuthenticated ? (
                             <>
-                                <NavbarText className="text-white me-3">
-                                    Hola, {user ? user.nombre || user.name : 'Usuario'}!
-                                </NavbarText>
+                                <Navbar.Text className="text-white me-3">
+                                    Hola, {user ? user.nombre || user.name : 'Usuario'}! 
+                                </Navbar.Text>
                                 <Button variant="outline-light" onClick={handleLogout}>
                                     Cerrar Sesión
                                 </Button>
