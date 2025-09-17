@@ -28,7 +28,11 @@ const UserManagementPage = () => {
             setError(null);
             const response = await api.get('/auth/users');
             const filteredUsers = response.data.users.filter(u => u.id !== user.id);
-            setUsers(filteredUsers);
+
+            // <<< ¡CAMBIO CLAVE AQUÍ! Ordenamos la lista por puntos_actuales de mayor a menor >>>
+            const sortedUsers = filteredUsers.sort((a, b) => b.puntos_actuales - a.puntos_actuales);
+            
+            setUsers(sortedUsers); // Guardamos la lista ya ordenada en el estado
         } catch (err) {
             console.error('Error al obtener la lista de usuarios:', err.response?.data || err.message);
             setError('Error al cargar usuarios. Verifica tu conexión o permisos.');
@@ -41,7 +45,6 @@ const UserManagementPage = () => {
         fetchUsers();
     }, [fetchUsers]);
 
-    // <<< CORRECCIÓN: Envolver todas las funciones handler en useCallback >>>
     const handleCloseEditModal = useCallback(() => {
         setShowEditModal(false);
         setCurrentUserToEdit(null);
@@ -84,6 +87,7 @@ const UserManagementPage = () => {
         }
     }, [currentUserToEdit, newRole, handleCloseEditModal, fetchUsers]);
     
+    // La lógica de filtrado no cambia, ya trabaja sobre la lista ordenada.
     const filteredUsers = users.filter(u =>
         (u.nombre && u.nombre.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (u.email && u.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -114,7 +118,7 @@ const UserManagementPage = () => {
     return (
         <Container className="mt-5">
             <h1 className="mb-4">Gestión de Usuarios</h1>
-            <p>Mostrando los primeros 10 usuarios. Para ver la lista completa, haz clic en el botón.</p>
+            <p>Mostrando los 10 usuarios con más puntos. Para ver la lista completa, haz clic en el botón.</p>
             {users.length > 0 ? renderUsersTable(users.slice(0, 10)) : <Alert variant="info">No hay usuarios.</Alert>}
             <Button variant="primary" onClick={() => setShowAllUsersModal(true)} className="mt-3">Ver todos los usuarios ({users.length})</Button>
 
@@ -151,3 +155,4 @@ const UserManagementPage = () => {
 };
 
 export default UserManagementPage;
+
