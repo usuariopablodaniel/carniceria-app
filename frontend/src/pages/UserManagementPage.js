@@ -76,8 +76,12 @@ const UserManagementPage = () => {
             return; 
         }
         try {
-            setLoading(true);
             setError(null);
+            // --- CORRECCIÓN CLAVE ---
+            // Se elimina setLoading(true) de aquí. El estado inicial ya es 'true',
+            // por lo que volver a establecerlo es innecesario y puede causar un parpadeo
+            // si la comprobación de autenticación (isAdmin) se resuelve en un ciclo de renderizado diferente.
+            // Mantenemos el componente en estado de carga desde el inicio hasta el final.
             const response = await api.get('/auth/users');
             const filteredUsers = response.data.users.filter(u => u.id !== user.id);
             const sortedUsers = filteredUsers.sort((a, b) => b.puntos_actuales - a.puntos_actuales);
@@ -132,7 +136,6 @@ const UserManagementPage = () => {
         if (window.confirm(`¿Estás seguro de que deseas eliminar al usuario ${userName}?`)) {
             try {
                 await api.delete(`/auth/users/${userId}`);
-                // En la simulación, actualizamos el estado local directamente
                 setUsers(prevUsers => prevUsers.filter(u => u.id !== userId));
                 if(currentUserToEdit && currentUserToEdit.id === userId) {
                     handleCloseEditModal();
@@ -157,7 +160,6 @@ const UserManagementPage = () => {
         }
         try {
             await api.put(`/auth/users/${currentUserToEdit.id}`, { role: newRole });
-            // En la simulación, actualizamos el estado local directamente
             setUsers(prevUsers => prevUsers.map(u => u.id === currentUserToEdit.id ? { ...u, role: newRole } : u));
             handleCloseEditModal();
         } catch (err) {
@@ -264,7 +266,7 @@ const UserManagementPage = () => {
                                             <td>{tx.tipo}</td>
                                             <td>{tx.monto}</td>
                                             <td>{tx.descripcion}</td>
-                                            <td>{new Date(tx.fecha).toLocaleString('es-AR')}</td>
+                                            <td>{new Date(tx.fecha).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}</td>
                                         </tr>
                                     ))}
                                 </tbody>
