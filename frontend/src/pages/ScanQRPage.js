@@ -1,6 +1,7 @@
 // frontend/src/pages/ScanQRPage.js
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Container, Form, Button, Alert, Spinner, Card, Row, Col } from 'react-bootstrap';
+// ¡CORRECCIÓN AQUÍ! Se añadió 'ListGroup'
+import { Container, Form, Button, Alert, Spinner, Card, Row, Col, Modal, ListGroup } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import Html5QrcodePlugin from '../components/Html5QrcodePlugin';
@@ -25,6 +26,11 @@ const ScanQRPage = () => {
     const [selectedRedemptionPoints, setSelectedRedemptionPoints] = useState(0);
     const [loadingRedemptionProducts, setLoadingRedemptionProducts] = useState(true);
     const [redemptionError, setRedemptionError] = useState('');
+
+    // Estado para el modal de confirmación de compra
+    const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+    // Estado para guardar los puntos calculados para el modal
+    const [pointsToAward, setPointsToAward] = useState(0);
 
     const amountInputRef = useRef(null);
 
@@ -110,22 +116,35 @@ const ScanQRPage = () => {
         }
     }, [setScannerActive, setScannedUserId, setScannedUserName, setMessage, setError, setRedemptionError, setAmount, setSelectedRedemptionProduct, setSelectedRedemptionPoints, amountInputRef, redemptionProducts]);
 
-    const handleRegisterPurchase = async (e) => {
+    // Modificamos handleRegisterPurchase. Ahora solo valida y abre el modal.
+    const handleRegisterPurchase = (e) => {
         e.preventDefault();
         setMessage('');
         setError('');
-        setIsProcessingPurchase(true);
 
         if (!scannedUserId) {
             setError('Por favor, escanea un código QR de usuario primero.');
-            setIsProcessingPurchase(false);
             return;
         }
         if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
             setError('Por favor, ingresa un monto de compra válido y positivo.');
-            setIsProcessingPurchase(false);
             return;
         }
+
+        // Calcula los puntos. (Ajusta esta lógica si es diferente)
+        // Ejemplo: 1 punto cada $10000
+        const calculatedPoints = Math.floor(parseFloat(amount) / 10000);
+        setPointsToAward(calculatedPoints);
+
+        // Abre el modal de confirmación
+        setShowPurchaseModal(true);
+    };
+
+    // Esta función se llama DESDE el modal y es la que realmente envía la solicitud.
+    const confirmActualPurchase = async () => {
+        setIsProcessingPurchase(true);
+        setError(''); // Limpia el error del formulario principal
+
         try {
             const response = await axios.post('/transactions/purchase', {
                 userId: scannedUserId,
@@ -148,10 +167,16 @@ const ScanQRPage = () => {
             }
         } finally {
             setIsProcessingPurchase(false);
+            setShowPurchaseModal(false); // Cierra el modal
             setTimeout(() => {
-                setScannerActive(true); 
+                setScannerActive(true); // Reactiva el escáner
             }, 500);
         }
+    };
+
+    // Función para cerrar el modal de compra
+    const cancelPurchase = () => {
+        setShowPurchaseModal(false);
     };
 
     const handleRegisterRedemption = async (e) => {
@@ -303,16 +328,10 @@ const ScanQRPage = () => {
                                 variant="success"
                                 type="submit" 
                                 className="w-100" 
-                                disabled={!scannedUserId || isProcessingPurchase}
+                                disabled={!scannedUserId || isProcessingPurchase || !amount} // Deshabilitado si no hay monto
                             >
-                                {isProcessingPurchase ? (
-                                    <>
-                                        <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
-                                        Procesando...
-                                    </>
-                                ) : (
-                                    'Registrar Compra y Asignar Puntos'
-                                )}
+                                {/* Texto cambiado para reflejar que abre el modal */}
+                                Registrar Compra y Asignar Puntos
                             </Button>
                         </Form>
                     </Card>
@@ -389,6 +408,48 @@ const ScanQRPage = () => {
                     </Card>
                 </Col>
             </Row>
+
+            {/* ---------- MODAL DE CONFIRMACIÓN DE COMPRA (CORREGIDO) ---------- */}
+            <Modal show={showPurchaseModal} onHide={cancelPurchase} centered>
+                <Modal.Header closeButton>
+                    <Modal.Title>Confirmar Transacción de Compra</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <p>Por favor, confirma los siguientes datos antes de procesar la compra:</p>
+                    {/* AHORA 'ListGroup' ESTÁ IMPORTADO Y DEBERÍA FUNCIONAR */}
+                    <ListGroup variant="flush">
+                        <ListGroup.Item>
+                            <strong>Cliente:</strong> {scannedUserName}
+                        </ListGroup.Item>
+                        <ListGroup.Item>
+                            <strong>Monto de la Compra:</strong> ${parseFloat(amount).toFixed(2)} ARS
+                        </ListGroup.Item>
+                        <ListGroup.Item>
+                            <strong>Puntos a Otorgar (Aprox):</strong> {pointsToAward}
+                        </ListGroup.Item>
+                    </ListGroup>
+                    <Alert variant="warning" className="mt-3">
+                        ¿Son correctos estos datos? Esta acción no se puede deshacer fácilmente.
+                    </Alert>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={cancelPurchase} disabled={isProcessingPurchase}>
+                        Cancelar
+                    </Button>
+                    <Button variant="success" onClick={confirmActualPurchase} disabled={isProcessingPurchase}>
+                        {isProcessingPurchase ? (
+                            <>
+                                <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
+                                Confirmando...
+                            </>
+                        ) : (
+                            'Confirmar y Registrar Compra'
+                        )}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+            {/* ---------- FIN DEL MODAL ---------- */}
+
         </Container>
     );
 };
