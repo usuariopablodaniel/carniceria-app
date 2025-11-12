@@ -6,9 +6,9 @@ const { protect } = require('../middleware/authMiddleware'); // Importa el middl
 // >>>>>>>>>>>>>>> NUEVA IMPORTACIÓN DEL POOL DE LA BASE DE DATOS <<<<<<<<<<<<<<<<
 const pool = require('../db'); // <-- CAMBIO AQUÍ: Importar el pool desde el nuevo archivo db.js
 
-// @route   POST /api/transactions/purchase
-// @desc    Register a purchase and assign points to a user
-// @access  Private (Admin/Employee)
+// @route   POST /api/transactions/purchase
+// @desc    Register a purchase and assign points to a user
+// @access  Private (Admin/Employee)
 router.post('/purchase', protect, async (req, res) => {
     const { userId, amount } = req.body;
     const adminId = req.user.id; // ID del admin/empleado que realiza la operación
@@ -60,15 +60,14 @@ router.post('/purchase', protect, async (req, res) => {
     }
 });
 
-// @route   POST /api/transactions/redeem
-// @desc    Redeem points for a user
-// @access  Private (Admin/Employee)
+// @route   POST /api/transactions/redeem
+// @desc    Redeem points for a user
+// @access  Private (Admin/Employee)
 router.post('/redeem', protect, async (req, res) => {
     const { userId, pointsToRedeem, productId } = req.body;
     const adminId = req.user.id; // ID del admin/empleado que realiza la operación
 
     // === MODIFICACIÓN: Validar y convertir productId a número ===
-    // Intentar convertir productId a un número si es una cadena, y validar que sea > 0
     let validatedProductId = parseInt(productId, 10);
 
     if (isNaN(validatedProductId) || validatedProductId <= 0) {
@@ -97,12 +96,10 @@ router.post('/redeem', protect, async (req, res) => {
         }
 
         // 2. Obtener el producto de canje para verificar puntos_canje
-        // Usar validatedProductId en la consulta
         const productResult = await pool.query('SELECT nombre, puntos_canje FROM productos WHERE id = $1', [validatedProductId]);
         
         if (productResult.rows.length === 0) {
             await pool.query('ROLLBACK');
-            // Si el producto no existe en la tabla "productos", es por lo que falla la FK en la DB.
             return res.status(404).json({ error: 'Producto de canje no encontrado en la base de datos de productos.' });
         }
         const product = productResult.rows[0];
@@ -122,7 +119,6 @@ router.post('/redeem', protect, async (req, res) => {
         // 4. Registrar la transacción de canje
         await pool.query(
             'INSERT INTO transacciones_puntos (cliente_id, tipo_transaccion, puntos_cantidad, premio_canjeado_id, fecha_transaccion, realizada_por_admin_id) VALUES ($1, $2, $3, $4, NOW(), $5)',
-            // Usar validatedProductId en el array de valores
             [userId, 'canje', -pointsToRedeem, validatedProductId, adminId] 
         );
 
@@ -140,9 +136,9 @@ router.post('/redeem', protect, async (req, res) => {
     }
 });
 
-// @route   GET /api/transactions/:userId/points
-// @desc    Get current points for a specific user
-// @access  Private (User itself or Admin/Employee)
+// @route   GET /api/transactions/:userId/points
+// @desc    Get current points for a specific user
+// @access  Private (User itself or Admin/Employee)
 router.get('/:userId/points', protect, async (req, res) => {
     const { userId } = req.params;
     const requestingUser = req.user; // Usuario autenticado del token
@@ -164,25 +160,34 @@ router.get('/:userId/points', protect, async (req, res) => {
     }
 });
 
-// RUTA DE HISTORIAL DE TRANSACCIONES
-router.get('/history/:userId', protect, async (req, res) => {
+// ====================================================================
+// >>>>>>>>>>>>>>>>> NUEVA RUTA DE HISTORIAL DE TRANSACCIONES <<<<<<<<<<<<<<<<<<<
+// ====================================================================
+
+// @route   GET /api/transactions/user/:userId/transactions
+// @desc    Get the last 10 transactions for a specific user
+// @access  Private (Admin/Employee)
+router.get('/user/:userId/transactions', protect, async (req, res) => {
     const { userId } = req.params;
     const requestingUser = req.user;
 
-    if (requestingUser.role !== 'admin' && requestingUser.role !== 'employee' && requestingUser.id.toString() !== userId.toString()) {
-        return res.status(403).json({ error: 'No autorizado para ver el historial de transacciones de este usuario.' });
+    // Autorización: Solo Admin/Empleado puede ver el historial de otros usuarios.
+    // El frontend de gestión de usuarios (UserManagementPage.js) solo es visible para Admin/Employee,
+    // pero es buena práctica tener la validación aquí.
+    if (requestingUser.role !== 'admin' && requestingUser.role !== 'employee') {
+        return res.status(403).json({ error: 'No autorizado para ver el historial de transacciones.' });
     }
 
     try {
         const query = `
             SELECT 
-                t.id,
                 t.tipo_transaccion,
                 t.monto_compra,
                 t.puntos_cantidad,
                 t.fecha_transaccion,
                 p.nombre AS nombre_producto_canjeado,
-                c.nombre AS nombre_admin_realizo
+                -- Usamos 'c' (clientes) para obtener el nombre del empleado que realizó la transacción
+                c.nombre AS scanner_user
             FROM 
                 transacciones_puntos t
             LEFT JOIN 
@@ -192,12 +197,30 @@ router.get('/history/:userId', protect, async (req, res) => {
             WHERE 
                 t.cliente_id = $1
             ORDER BY 
-                t.fecha_transaccion DESC;
-            `;
+                t.fecha_transaccion DESC
+            LIMIT 10;
+        `;
+        
         const result = await pool.query(query, [userId]);
-        res.status(200).json(result.rows);
+        
+        // El frontend espera un array de transacciones con los campos:
+        // transaction_date (fecha_transaccion), transaction_type (tipo_transaccion), scanner_user (nombre_admin_realizo)
+        // La consulta SQL ya mapea los nombres de columna necesarios.
+        
+        // Mapeamos los nombres de columna al formato que espera el frontend (solo por consistencia, no es estrictamente necesario si el frontend se adapta a los nombres de la DB):
+        const transactions = result.rows.map(row => ({
+            transaction_date: row.fecha_transaccion,
+            transaction_type: row.tipo_transaccion,
+            scanner_user: row.scanner_user || 'Sistema', // Si es NULL, asumimos que fue una carga inicial o por sistema
+            monto_compra: row.monto_compra,
+            puntos_cantidad: row.puntos_cantidad,
+            producto_canjeado: row.nombre_producto_canjeado
+        }));
+        
+        res.status(200).json(transactions);
+        
     } catch (err) {
-        console.error('Error al obtener el historial de transacciones:', err.message);
+        console.error(`Error al obtener el historial de transacciones para el usuario ${userId}:`, err.message);
         res.status(500).json({ error: 'Error interno del servidor al obtener el historial de transacciones.' });
     }
 });
