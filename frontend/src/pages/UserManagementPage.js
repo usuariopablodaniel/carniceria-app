@@ -1,8 +1,9 @@
 // frontend/src/pages/UserManagementPage.js
 import React, { useState, useEffect, useCallback } from 'react';
-import { Container, Table, Button, Spinner, Alert, Modal, Form } from 'react-bootstrap';
+// IMPORTANTE: Se añade 'ListGroup' para el diseño de la tabla en el modal (aunque Table ya es suficiente)
+import { Container, Table, Button, Spinner, Alert, Modal, Form, ListGroup } from 'react-bootstrap'; 
 import { useAuth } from '../context/AuthContext';
-import api from '../api/axios';
+import api from '../api/axios'; // Asumiendo que 'api' es tu instancia de axios
 
 const UserManagementPage = () => {
     const { token, isAdmin, user } = useAuth();
@@ -17,6 +18,12 @@ const UserManagementPage = () => {
     const [currentUserToEdit, setCurrentUserToEdit] = useState(null);
     const [newRole, setNewRole] = useState('');
 
+    // --- ESTADOS NUEVOS PARA TRANSACCIONES ---
+    const [recentTransactions, setRecentTransactions] = useState([]);
+    const [loadingTransactions, setLoadingTransactions] = useState(false);
+    const [transactionError, setTransactionError] = useState(null);
+    // ----------------------------------------
+
     const fetchUsers = useCallback(async () => {
         if (!isAdmin || !token) {
             setLoading(false);
@@ -29,7 +36,7 @@ const UserManagementPage = () => {
             const response = await api.get('/auth/users');
             const filteredUsers = response.data.users.filter(u => u.id !== user.id);
 
-            // <<< ¡CAMBIO CLAVE AQUÍ! Ordenamos la lista por puntos_actuales de mayor a menor >>>
+            // Ordenamos la lista por puntos_actuales de mayor a menor
             const sortedUsers = filteredUsers.sort((a, b) => b.puntos_actuales - a.puntos_actuales);
             
             setUsers(sortedUsers); // Guardamos la lista ya ordenada en el estado
@@ -41,6 +48,24 @@ const UserManagementPage = () => {
         }
     }, [isAdmin, token, user]);
 
+    // --- FUNCIÓN NUEVA: Cargar Transacciones ---
+    const fetchTransactions = useCallback(async (userId) => {
+        setLoadingTransactions(true);
+        setTransactionError(null);
+        try {
+            // ESTA RUTA DEBE EXISTIR EN TU BACKEND
+            const response = await api.get(`/transactions/user/${userId}`); 
+            setRecentTransactions(response.data);
+        } catch (err) {
+            console.error('Error al cargar transacciones:', err.response?.data || err.message);
+            setTransactionError('Error al cargar las transacciones. Verifica la ruta /transactions/user/:userId');
+            setRecentTransactions([]);
+        } finally {
+            setLoadingTransactions(false);
+        }
+    }, []);
+    // ----------------------------------------
+
     useEffect(() => {
         fetchUsers();
     }, [fetchUsers]);
@@ -49,6 +74,9 @@ const UserManagementPage = () => {
         setShowEditModal(false);
         setCurrentUserToEdit(null);
         setNewRole('');
+        // Limpiamos los estados de transacción al cerrar
+        setRecentTransactions([]);
+        setTransactionError(null);
     }, []);
 
     const handleDeleteUser = useCallback(async (userId, userName) => {
@@ -66,11 +94,17 @@ const UserManagementPage = () => {
         }
     }, [fetchUsers, currentUserToEdit, handleCloseEditModal]);
 
+    // --- FUNCIÓN MODIFICADA: Ahora carga transacciones ---
     const handleEditClick = useCallback((userToEdit) => {
         setCurrentUserToEdit(userToEdit);
         setNewRole(userToEdit.role); 
         setShowEditModal(true);
-    }, []);
+        
+        // Cargar las transacciones inmediatamente
+        fetchTransactions(userToEdit.id); 
+
+    }, [fetchTransactions]);
+    // ----------------------------------------
 
     const handleUpdateRole = useCallback(async () => {
         if (!currentUserToEdit || !newRole) {
@@ -106,7 +140,8 @@ const UserManagementPage = () => {
                     <tr key={u.id}>
                         <td>{u.id}</td><td>{u.nombre}</td><td>{u.email}</td><td>{u.role}</td><td>{u.puntos_actuales}</td>
                         <td>
-                            <Button variant="warning" size="sm" className="me-2" onClick={() => handleEditClick(u)}>Editar</Button>
+                            {/* Modifica la función para que no solo edite, sino que cargue el historial */}
+                            <Button variant="warning" size="sm" className="me-2" onClick={() => handleEditClick(u)}>Detalles/Editar</Button>
                             <Button variant="danger" size="sm" onClick={() => handleDeleteUser(u.id, u.nombre)}>Eliminar</Button>
                         </td>
                     </tr>
@@ -114,6 +149,45 @@ const UserManagementPage = () => {
             </tbody>
         </Table>
     );
+
+    // --- Función de ayuda para renderizar la tabla de transacciones ---
+    const renderTransactionsTable = () => {
+        if (loadingTransactions) {
+            return <div className="text-center"><Spinner animation="border" size="sm" className="me-2" /> Cargando historial...</div>;
+        }
+        if (transactionError) {
+            return <Alert variant="danger">{transactionError}</Alert>;
+        }
+        if (recentTransactions.length === 0) {
+            return <Alert variant="info">No se encontraron transacciones recientes.</Alert>;
+        }
+
+        return (
+            <Table striped bordered hover size="sm">
+                <thead>
+                    <tr>
+                        <th>Fecha y Hora</th>
+                        <th>Tipo</th>
+                        <th>Empleado que escaneó</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {recentTransactions.map((tx, index) => (
+                        <tr key={index}>
+                            <td>{new Date(tx.transaction_date).toLocaleString()}</td>
+                            <td>
+                                <strong>{tx.transaction_type === 'REDEMPTION' ? 'Canje' : 'Carga de Puntos'}</strong>
+                            </td>
+                            {/* Asume que el backend devuelve el nombre del empleado en 'scanner_user' */}
+                            <td>{tx.scanner_user || 'Sistema/Admin'}</td> 
+                        </tr>
+                    ))}
+                </tbody>
+            </Table>
+        );
+    };
+    // ----------------------------------------
+
 
     return (
         <Container className="mt-5">
@@ -133,16 +207,30 @@ const UserManagementPage = () => {
                 <Modal.Footer><Button variant="secondary" onClick={() => setShowAllUsersModal(false)}>Cerrar</Button></Modal.Footer>
             </Modal>
 
-            <Modal show={showEditModal} onHide={handleCloseEditModal}>
+            {/* --- MODAL DE EDICIÓN MODIFICADO CON HISTORIAL --- */}
+            <Modal show={showEditModal} onHide={handleCloseEditModal} size="lg">
                 <Modal.Header closeButton><Modal.Title>Detalles de {currentUserToEdit?.nombre}</Modal.Title></Modal.Header>
                 <Modal.Body>
-                    <p><strong>ID:</strong> {currentUserToEdit?.id}</p><p><strong>Email:</strong> {currentUserToEdit?.email}</p><p><strong>Puntos:</strong> {currentUserToEdit?.puntos_actuales}</p><hr />
-                    <Form.Group>
+                    {/* Información Básica */}
+                    <ListGroup className="mb-4">
+                        <ListGroup.Item><strong>ID:</strong> {currentUserToEdit?.id}</ListGroup.Item>
+                        <ListGroup.Item><strong>Email:</strong> {currentUserToEdit?.email}</ListGroup.Item>
+                        <ListGroup.Item><strong>Puntos Actuales:</strong> {currentUserToEdit?.puntos_actuales}</ListGroup.Item>
+                    </ListGroup>
+                    
+                    {/* Sección de Edición de Rol */}
+                    <h5 className="mb-3">Editar Rol</h5>
+                    <Form.Group className="mb-4">
                         <Form.Label>Selecciona Nuevo Rol:</Form.Label>
                         <Form.Control as="select" value={newRole} onChange={(e) => setNewRole(e.target.value)}>
                             <option value="user">Usuario (user)</option><option value="admin">Administrador (admin)</option><option value="employee">Empleado (employee)</option>
                         </Form.Control>
                     </Form.Group>
+
+                    {/* Sección de Historial de Transacciones */}
+                    <h5 className="mt-4 mb-3">Últimas 10 Transacciones</h5>
+                    {renderTransactionsTable()}
+
                 </Modal.Body>
                 <Modal.Footer>
                     <Button variant="secondary" onClick={handleCloseEditModal}>Cancelar</Button>
@@ -150,9 +238,9 @@ const UserManagementPage = () => {
                     <Button variant="danger" className="ms-auto" onClick={() => handleDeleteUser(currentUserToEdit?.id, currentUserToEdit?.nombre)}>Eliminar Usuario</Button>
                 </Modal.Footer>
             </Modal>
+            {/* ---------------------------------------------------- */}
         </Container>
     );
 };
 
 export default UserManagementPage;
-
