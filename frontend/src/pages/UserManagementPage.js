@@ -1,9 +1,7 @@
-// frontend/src/pages/UserManagementPage.js
 import React, { useState, useEffect, useCallback } from 'react';
-// IMPORTANTE: Se añade 'ListGroup' para el diseño de la tabla en el modal (aunque Table ya es suficiente)
 import { Container, Table, Button, Spinner, Alert, Modal, Form, ListGroup } from 'react-bootstrap'; 
 import { useAuth } from '../context/AuthContext';
-import api from '../api/axios'; // Asumiendo que 'api' es tu instancia de axios
+import api from '../api/axios'; 
 
 const UserManagementPage = () => {
     const { token, isAdmin, user } = useAuth();
@@ -18,7 +16,7 @@ const UserManagementPage = () => {
     const [currentUserToEdit, setCurrentUserToEdit] = useState(null);
     const [newRole, setNewRole] = useState('');
 
-    // --- ESTADOS NUEVOS PARA TRANSACCIONES ---
+    // --- ESTADOS PARA TRANSACCIONES ---
     const [recentTransactions, setRecentTransactions] = useState([]);
     const [loadingTransactions, setLoadingTransactions] = useState(false);
     const [transactionError, setTransactionError] = useState(null);
@@ -36,10 +34,9 @@ const UserManagementPage = () => {
             const response = await api.get('/auth/users');
             const filteredUsers = response.data.users.filter(u => u.id !== user.id);
 
-            // Ordenamos la lista por puntos_actuales de mayor a menor
             const sortedUsers = filteredUsers.sort((a, b) => b.puntos_actuales - a.puntos_actuales);
             
-            setUsers(sortedUsers); // Guardamos la lista ya ordenada en el estado
+            setUsers(sortedUsers); 
         } catch (err) {
             console.error('Error al obtener la lista de usuarios:', err.response?.data || err.message);
             setError('Error al cargar usuarios. Verifica tu conexión o permisos.');
@@ -53,12 +50,12 @@ const UserManagementPage = () => {
         setLoadingTransactions(true);
         setTransactionError(null);
         try {
-            // ESTA RUTA DEBE EXISTIR EN TU BACKEND
+            // RUTA CORREGIDA EN EL BACKEND: /transactions/user/:userId
             const response = await api.get(`/transactions/user/${userId}`); 
             setRecentTransactions(response.data);
         } catch (err) {
             console.error('Error al cargar transacciones:', err.response?.data || err.message);
-            setTransactionError('Error al cargar las transacciones. Verifica la ruta /transactions/user/:userId');
+            setTransactionError('Error al cargar las transacciones. El backend devolvió un error: ' + (err.response?.data?.error || 'Desconocido'));
             setRecentTransactions([]);
         } finally {
             setLoadingTransactions(false);
@@ -74,12 +71,12 @@ const UserManagementPage = () => {
         setShowEditModal(false);
         setCurrentUserToEdit(null);
         setNewRole('');
-        // Limpiamos los estados de transacción al cerrar
         setRecentTransactions([]);
         setTransactionError(null);
     }, []);
 
     const handleDeleteUser = useCallback(async (userId, userName) => {
+        // NOTE: Debes reemplazar window.confirm por un modal personalizado en producción
         if (window.confirm(`¿Estás seguro de que deseas eliminar al usuario ${userName}?`)) {
             try {
                 await api.delete(`/auth/users/${userId}`);
@@ -94,7 +91,6 @@ const UserManagementPage = () => {
         }
     }, [fetchUsers, currentUserToEdit, handleCloseEditModal]);
 
-    // --- FUNCIÓN MODIFICADA: Ahora carga transacciones ---
     const handleEditClick = useCallback((userToEdit) => {
         setCurrentUserToEdit(userToEdit);
         setNewRole(userToEdit.role); 
@@ -104,7 +100,6 @@ const UserManagementPage = () => {
         fetchTransactions(userToEdit.id); 
 
     }, [fetchTransactions]);
-    // ----------------------------------------
 
     const handleUpdateRole = useCallback(async () => {
         if (!currentUserToEdit || !newRole) {
@@ -121,7 +116,6 @@ const UserManagementPage = () => {
         }
     }, [currentUserToEdit, newRole, handleCloseEditModal, fetchUsers]);
     
-    // La lógica de filtrado no cambia, ya trabaja sobre la lista ordenada.
     const filteredUsers = users.filter(u =>
         (u.nombre && u.nombre.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (u.email && u.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -140,7 +134,6 @@ const UserManagementPage = () => {
                     <tr key={u.id}>
                         <td>{u.id}</td><td>{u.nombre}</td><td>{u.email}</td><td>{u.role}</td><td>{u.puntos_actuales}</td>
                         <td>
-                            {/* Modifica la función para que no solo edite, sino que cargue el historial */}
                             <Button variant="warning" size="sm" className="me-2" onClick={() => handleEditClick(u)}>Detalles/Editar</Button>
                             <Button variant="danger" size="sm" onClick={() => handleDeleteUser(u.id, u.nombre)}>Eliminar</Button>
                         </td>
@@ -150,7 +143,7 @@ const UserManagementPage = () => {
         </Table>
     );
 
-    // --- Función de ayuda para renderizar la tabla de transacciones ---
+    // --- Función de ayuda para renderizar la tabla de transacciones (Mejorada) ---
     const renderTransactionsTable = () => {
         if (loadingTransactions) {
             return <div className="text-center"><Spinner animation="border" size="sm" className="me-2" /> Cargando historial...</div>;
@@ -168,7 +161,9 @@ const UserManagementPage = () => {
                     <tr>
                         <th>Fecha y Hora</th>
                         <th>Tipo</th>
-                        <th>Empleado que escaneó</th>
+                        <th>Detalle</th>
+                        <th>Puntos</th>
+                        <th>Escaneado por</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -176,9 +171,19 @@ const UserManagementPage = () => {
                         <tr key={index}>
                             <td>{new Date(tx.transaction_date).toLocaleString()}</td>
                             <td>
-                                <strong>{tx.transaction_type === 'REDEMPTION' ? 'Canje' : 'Carga de Puntos'}</strong>
+                                <strong>{tx.transaction_type === 'REDEMPTION' ? 'Canje (REDEMPTION)' : 'Carga (COMPRA)'}</strong>
                             </td>
-                            {/* Asume que el backend devuelve el nombre del empleado en 'scanner_user' */}
+                            <td>
+                                {tx.transaction_type === 'REDEMPTION' 
+                                    ? `Canjeó ${tx.producto_canjeado}` 
+                                    : `Compra de $${tx.monto_compra || 'N/A'}`
+                                }
+                            </td>
+                            <td>
+                                <span className={tx.puntos_cantidad > 0 ? 'text-success' : 'text-danger'}>
+                                    {tx.puntos_cantidad}
+                                </span>
+                            </td>
                             <td>{tx.scanner_user || 'Sistema/Admin'}</td> 
                         </tr>
                     ))}
@@ -208,14 +213,15 @@ const UserManagementPage = () => {
             </Modal>
 
             {/* --- MODAL DE EDICIÓN MODIFICADO CON HISTORIAL --- */}
-            <Modal show={showEditModal} onHide={handleCloseEditModal} size="lg">
+            <Modal show={showEditModal} onHide={handleCloseEditModal} size="xl">
                 <Modal.Header closeButton><Modal.Title>Detalles de {currentUserToEdit?.nombre}</Modal.Title></Modal.Header>
                 <Modal.Body>
                     {/* Información Básica */}
                     <ListGroup className="mb-4">
                         <ListGroup.Item><strong>ID:</strong> {currentUserToEdit?.id}</ListGroup.Item>
                         <ListGroup.Item><strong>Email:</strong> {currentUserToEdit?.email}</ListGroup.Item>
-                        <ListGroup.Item><strong>Puntos Actuales:</strong> {currentUserToEdit?.puntos_actuales}</ListGroup.Item>
+                        <ListGroup.Item><strong>Rol Actual:</strong> {currentUserToEdit?.role}</ListGroup.Item>
+                        <ListGroup.Item className="bg-success text-white"><strong>Puntos Actuales:</strong> {currentUserToEdit?.puntos_actuales}</ListGroup.Item>
                     </ListGroup>
                     
                     {/* Sección de Edición de Rol */}
