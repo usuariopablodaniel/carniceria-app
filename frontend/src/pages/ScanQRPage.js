@@ -1,6 +1,8 @@
+
+//ESTE ES EL CODIGO NUEVO QUE HAUY QUE SUBIR, PERO PRIMERO GUARDAR EL ORIGINAL!
+
 // frontend/src/pages/ScanQRPage.js
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-// ¡CORRECCIÓN AQUÍ! Se añadió 'ListGroup'
 import { Container, Form, Button, Alert, Spinner, Card, Row, Col, Modal, ListGroup } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -77,21 +79,59 @@ const ScanQRPage = () => {
             if (data.userId && data.productId) {
                 userId = data.userId;
                 redemptionProductId = data.productId;
-                setSelectedRedemptionProduct(redemptionProductId); // Establece el producto de canje automáticamente
+                // No establecemos setSelectedRedemptionProduct aquí, lo hacemos más abajo después de obtener los puntos.
             } else {
                 // Si no tiene el formato esperado, asume que es un simple ID
                 userId = decodedText;
-                setSelectedRedemptionProduct('');
             }
         } catch (e) {
             // Si el análisis falla, asume que es un simple ID
             userId = decodedText;
-            setSelectedRedemptionProduct('');
         }
 
         setScannedUserId(userId);
 
+        // =========================================================================
+        // INICIO: LÓGICA DE CANJE CORREGIDA (SOLUCIÓN AL ERROR DE SINCRONIZACIÓN)
+        // =========================================================================
+        
+        let finalRedemptionProductId = redemptionProductId;
+        let finalRedemptionPoints = 0;
+
+        if (finalRedemptionProductId) {
+            // 1. Intentar encontrar el producto en el estado local (redemptionProducts)
+            let product = redemptionProducts.find(p => p.id.toString() === finalRedemptionProductId.toString());
+
+            if (!product) {
+                // 2. Si el producto no está en el estado local (e.g., primer escaneo, estado desactualizado),
+                //    hacer una llamada directa a la API para obtener el producto.
+                try {
+                    // **ASUMIMOS QUE ESTE ENDPOINT EXISTE:** GET /products/:productId
+                    const productResponse = await axios.get(`/products/${finalRedemptionProductId}`); 
+                    product = productResponse.data;
+                } catch (productFetchError) {
+                    console.error('ScanQRPage: Error al obtener producto de canje por ID:', finalRedemptionProductId, productFetchError);
+                    setRedemptionError(`Producto con ID ${finalRedemptionProductId} no encontrado o inaccesible.`);
+                }
+            }
+            
+            if (product && product.puntos_canje > 0) {
+                finalRedemptionPoints = product.puntos_canje;
+            } else if (product) {
+                 // Si el producto existe pero no tiene puntos_canje > 0.
+                setRedemptionError('El producto escaneado no es canjeable o requiere 0 puntos.');
+            }
+        }
+        
+        setSelectedRedemptionProduct(finalRedemptionProductId || '');
+        setSelectedRedemptionPoints(finalRedemptionPoints);
+
+        // =========================================================================
+        // FIN: LÓGICA DE CANJE CORREGIDA
+        // =========================================================================
+
         try {
+            // Obtener el nombre del usuario
             const response = await axios.get(`/auth/user/${userId}`); 
             if (response.data && response.data.user) {
                 setScannedUserName(response.data.user.nombre || response.data.user.name || `ID: ${userId}`);
@@ -103,18 +143,10 @@ const ScanQRPage = () => {
             setScannedUserName(`ID: ${userId} (Error al cargar nombre)`);
         }
         
-        // La lógica para establecer los puntos del producto seleccionado (si existe)
-        if (redemptionProductId) {
-            const product = redemptionProducts.find(p => p.id.toString() === redemptionProductId.toString());
-            setSelectedRedemptionPoints(product ? product.puntos_canje : 0);
-        } else {
-            setSelectedRedemptionPoints(0);
-        }
-
         if (amountInputRef.current) {
             amountInputRef.current.focus();
         }
-    }, [setScannerActive, setScannedUserId, setScannedUserName, setMessage, setError, setRedemptionError, setAmount, setSelectedRedemptionProduct, setSelectedRedemptionPoints, amountInputRef, redemptionProducts]);
+    }, [amountInputRef, redemptionProducts]); // Mantenemos redemptionProducts en dependencias
 
     // Modificamos handleRegisterPurchase. Ahora solo valida y abre el modal.
     const handleRegisterPurchase = (e) => {
@@ -170,7 +202,7 @@ const ScanQRPage = () => {
             setShowPurchaseModal(false); // Cierra el modal
             setTimeout(() => {
                 setScannerActive(true); // Reactiva el escáner
-            }, 500);
+            }, 1000); // Pequeño delay de 1s para evitar doble escaneo
         }
     };
 
@@ -221,8 +253,8 @@ const ScanQRPage = () => {
         } finally {
             setIsProcessingRedemption(false);
             setTimeout(() => {
-                setScannerActive(true); 
-            }, 500);
+                setScannerActive(true); // Reactiva el escáner
+            }, 1000); // Pequeño delay de 1s para evitar doble escaneo
         }
     };
 
@@ -330,7 +362,6 @@ const ScanQRPage = () => {
                                 className="w-100" 
                                 disabled={!scannedUserId || isProcessingPurchase || !amount} // Deshabilitado si no hay monto
                             >
-                                {/* Texto cambiado para reflejar que abre el modal */}
                                 Registrar Compra y Asignar Puntos
                             </Button>
                         </Form>
@@ -409,14 +440,13 @@ const ScanQRPage = () => {
                 </Col>
             </Row>
 
-            {/* ---------- MODAL DE CONFIRMACIÓN DE COMPRA (CORREGIDO) ---------- */}
+            {/* ---------- MODAL DE CONFIRMACIÓN DE COMPRA ---------- */}
             <Modal show={showPurchaseModal} onHide={cancelPurchase} centered>
                 <Modal.Header closeButton>
                     <Modal.Title>Confirmar Transacción de Compra</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
                     <p>Por favor, confirma los siguientes datos antes de procesar la compra:</p>
-                    {/* AHORA 'ListGroup' ESTÁ IMPORTADO Y DEBERÍA FUNCIONAR */}
                     <ListGroup variant="flush">
                         <ListGroup.Item>
                             <strong>Cliente:</strong> {scannedUserName}

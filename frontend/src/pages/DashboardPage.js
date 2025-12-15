@@ -1,313 +1,191 @@
 // frontend/src/pages/DashboardPage.js
-import React, { useEffect, useState } from 'react';
-import { Container, Card, Row, Col, Spinner, Alert, ListGroup, Button, Modal } from 'react-bootstrap';
-import { QRCodeCanvas } from 'qrcode.react';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { Container, Card, Row, Col, Spinner, Alert, Button, Table } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
+import { FaUserCircle, FaRedoAlt, FaShoppingCart, FaGift, FaExchangeAlt } from 'react-icons/fa';
 import axios from '../api/axios';
-import { useLocation } from 'react-router-dom';
+
+// Función auxiliar para formatear la fecha
+const formatDate = (dateString) => {
+    const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+    return new Date(dateString).toLocaleDateString(undefined, options);
+};
 
 const DashboardPage = () => {
-    const { user, isAuthenticated, loadingAuth } = useAuth();
-    const [userPoints, setUserPoints] = useState(null);
-    const [loadingPoints, setLoadingPoints] = useState(true);
-    const [pointsError, setPointsError] = useState(null);
-    const location = useLocation();
+    const { user, isAuthenticated, loadingAuth, refreshUser, userDetails } = useAuth();
+    
+    // --- ESTADOS PARA TRANSACCIONES ---
+    const [userTransactions, setUserTransactions] = useState([]);
+    const [loadingTransactions, setLoadingTransactions] = useState(false);
+    const [transactionError, setTransactionError] = useState(null);
+    // ----------------------------------------
 
-    // NUEVOS ESTADOS PARA EL HISTORIAL DE TRANSACCIONES
-    const [transactions, setTransactions] = useState([]);
-    const [loadingTransactions, setLoadingTransactions] = useState(true);
-    const [transactionsError, setTransactionsError] = useState(null);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
-    // Estado para el mensaje de redirección
-    const [redirectMessage, setRedirectMessage] = useState(null);
-    const [messageVariant, setMessageVariant] = useState('info');
-
-    // Estado para el valor del QR
-    const [qrValue, setQrValue] = useState('');
-
-    // <==== ESTADOS Y FUNCIONES PARA EL MODAL AGREGADOS ====>
-    const [showModal, setShowModal] = useState(false);
-    const handleShowModal = () => setShowModal(true);
-    const handleCloseModal = () => setShowModal(false);
-
-    // Efecto para manejar mensajes de redirección y generar el QR
-    useEffect(() => {
-        if (location.state && location.state.message) {
-            setRedirectMessage(location.state.message);
-            setMessageVariant(location.state.variant || 'info');
-            window.history.replaceState({}, document.title); 
-        }
-
-        if (location.state?.canjeo) {
-            const { productToRedeem } = location.state;
-            const canjeData = {
-                userId: user.id,
-                productId: productToRedeem.id,
-                productName: productToRedeem.nombre,
-                timestamp: new Date().toISOString(),
-            };
-            setQrValue(JSON.stringify(canjeData));
-        } else {
-            if (user && user.id) {
-                setQrValue(user.id.toString());
-            }
-        }
-    }, [location.state, user]);
-
-    // Efecto para obtener los puntos del usuario
-    useEffect(() => {
-        const fetchUserPoints = async () => {
-            if (!isAuthenticated || !user || !user.id) {
-                setLoadingPoints(false);
-                return;
-            }
-            try {
-                setLoadingPoints(true);
-                setPointsError(null);
-                const response = await axios.get(`/transactions/${user.id}/points`);
-                setUserPoints(response.data.points);
-            } catch (err) {
-                console.error('Error al obtener los puntos del usuario:', err);
-                setPointsError('No se pudieron cargar tus puntos.');
-            } finally {
-                setLoadingPoints(false);
-            }
-        };
-
-        if (!loadingAuth) {
-            fetchUserPoints();
-        }
-    }, [isAuthenticated, user, loadingAuth]);
-
-    // NUEVO EFECTO PARA OBTENER EL HISTORIAL DE TRANSACCIONES
-    useEffect(() => {
-        const fetchTransactionsHistory = async () => {
-            if (!isAuthenticated || !user || !user.id) {
-                setLoadingTransactions(false);
-                return;
-            }
-            try {
-                setLoadingTransactions(true);
-                setTransactionsError(null);
-                const response = await axios.get(`/transactions/history/${user.id}`);
-                setTransactions(response.data);
-            } catch (err) {
-                console.error('Error al obtener el historial de transacciones:', err);
-                setTransactionsError('No se pudo cargar tu historial de transacciones.');
-            } finally {
-                setLoadingTransactions(false);
-            }
-        };
-
-        if (!loadingAuth) {
-            fetchTransactionsHistory();
-        }
-    }, [isAuthenticated, user, loadingAuth]);
-
-    const formatDateTime = (isoString) => {
-        const date = new Date(isoString);
-        return date.toLocaleString('es-AR', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric', 
-            hour: '2-digit', 
-            minute: '2-digit' 
-        });
+    // Lógica para recargar puntos
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        await refreshUser(); 
+        setIsRefreshing(false);
     };
 
+    // --- EFECTO PARA CARGAR TRANSACCIONES ---
+    const fetchUserTransactions = useCallback(async (userId) => {
+        if (!userId) return;
+
+        setLoadingTransactions(true);
+        setTransactionError(null);
+        try {
+            // Llama a la ruta: GET /api/transactions/user/:userId
+            const response = await axios.get(`/transactions/user/${userId}`);
+            setUserTransactions(response.data);
+        } catch (err) {
+            console.error('DashboardPage: Error al obtener transacciones:', err);
+            setTransactionError('Error al cargar las últimas transacciones.');
+            setUserTransactions([]);
+        } finally {
+            setLoadingTransactions(false);
+        }
+    }, []);
+
+    // Ejecuta la carga de transacciones cuando el usuario está autenticado y tiene ID.
+    useEffect(() => {
+        if (isAuthenticated && user && user.id) {
+            fetchUserTransactions(user.id);
+        }
+    }, [isAuthenticated, user, fetchUserTransactions]);
+
+    // Lógica de redirección y carga de autenticación (se mantiene)
     if (loadingAuth) {
         return (
             <Container className="my-5 text-center">
-                <Spinner animation="border" className="mt-3" />
-                <p>Cargando información del usuario...</p>
+                <Spinner animation="border" role="status">
+                    <span className="visually-hidden">Cargando...</span>
+                </Spinner>
             </Container>
         );
     }
 
-    if (!isAuthenticated) {
-        return (
-            <Container className="my-5 text-center">
-                <h2 className="mb-3">Acceso Denegado</h2>
-                <p className="text-muted">Por favor, inicia sesión para ver tu dashboard.</p>
-            </Container>
-        );
+    if (!isAuthenticated || !user) {
+        return <Alert variant="danger" className="text-center">No autenticado.</Alert>;
     }
+
+    const { nombre, email, role, puntos_disponibles } = userDetails || user;
 
     return (
-        <Container className="my-5 p-4 border rounded shadow-sm" style={{ maxWidth: '800px' }}>
-            <h1 className="mb-4 text-center text-primary">
-                Bienvenido, {user && user.nombre ? user.nombre : 'Usuario'}!
+        <Container className="my-5 p-4 border rounded shadow-lg bg-light">
+            <h1 className="mb-4 text-primary">
+                <FaUserCircle className="me-3" /> Dashboard de Usuario
             </h1>
-            <p className="text-center text-muted mb-4">Tu centro de control de puntos y perfil.</p>
 
-            {redirectMessage && (
-                <Alert variant={messageVariant} onClose={() => setRedirectMessage(null)} dismissible className="mb-4">
-                    {redirectMessage}
-                </Alert>
-            )}
-
-            <Row className="g-4">
-                <Col md={6}>
-                    <Card className="h-100 shadow-sm rounded-lg">
-                        <Card.Body className="text-center">
-                            <Card.Title className="mb-3">Tus Puntos Actuales</Card.Title>
-                            {loadingPoints ? (
-                                <Spinner animation="border" />
-                            ) : pointsError ? (
-                                <Alert variant="danger" className="mt-3">{pointsError}</Alert>
-                            ) : (
-                                <h2 className="display-4 text-success">{userPoints !== null ? userPoints : 'N/A'}</h2>
-                            )}
-                            <Card.Text className="text-muted mt-3">
-                                ¡Sigue acumulando puntos con cada compra!
+            {/* --- Tarjeta de Información y Puntos --- */}
+            <Row className="mb-5">
+                <Col md={6} className="mb-3">
+                    <Card className="shadow-sm h-100">
+                        <Card.Body>
+                            <Card.Title className="text-muted">Información Personal</Card.Title>
+                            <Card.Text>
+                                <strong>Nombre:</strong> {nombre || 'N/A'} <br />
+                                <strong>Email:</strong> {email} <br />
+                                <strong>Rol:</strong> {role}
                             </Card.Text>
                         </Card.Body>
                     </Card>
                 </Col>
-                <Col md={6}>
-                    <Card className="h-100 shadow-sm rounded-lg">
-                        <Card.Body className="text-center">
-                            {location.state?.canjeo ? (
-                                <>
-                                    <Card.Title className="mb-3">Código de Canje</Card.Title>
-                                    <div className="d-flex justify-content-center mb-3">
-                                        {qrValue ? (
-                                            <QRCodeCanvas 
-                                                value={qrValue} 
-                                                size={180} 
-                                                level="H" 
-                                                includeMargin={true} 
-                                            />
-                                        ) : (
-                                            <Spinner animation="border" />
-                                        )}
-                                    </div>
-                                    <p className="fw-bold mt-2">Muestra este QR al vendedor para canjear tu producto.</p>
-                                    <Card.Text className="text-muted">
-                                        Este código es único y válido solo para esta transacción.
-                                    </Card.Text>
-                                </>
-                            ) : (
-                                <>
-                                    <Card.Title className="mb-3">Tu Código QR de Usuario</Card.Title>
-                                    <div className="d-flex justify-content-center mb-3">
-                                        {qrValue ? (
-                                            <QRCodeCanvas 
-                                                value={qrValue} 
-                                                size={180} 
-                                                level="H" 
-                                                includeMargin={true} 
-                                            />
-                                        ) : (
-                                            <Spinner animation="border" />
-                                        )}
-                                    </div>
-                                    <Card.Text className="text-muted">
-                                        Muestra este QR al vendedor para registrar tus compras y canjes.
-                                    </Card.Text>
-                                    <p className="fw-bold mt-2">ID de Usuario: {user?.id}</p>
-                                </>
-                            )}
+
+                <Col md={6} className="mb-3">
+                    <Card className="shadow-sm border-warning h-100">
+                        <Card.Body className="d-flex flex-column justify-content-between">
+                            <div>
+                                <Card.Title className="text-warning mb-3">Puntos Acumulados</Card.Title>
+                                <h2 className="display-4 text-center mb-4">
+                                    {/* LÍNEA 108 CORREGIDA: Se eliminaron los ** que causaban error de parsing */}
+                                    {isRefreshing ? <Spinner animation="border" size="sm" /> : puntos_disponibles !== undefined ? puntos_disponibles.toLocaleString() : '---'}
+                                </h2>
+                            </div>
+                            <Button 
+                                variant="outline-warning" 
+                                onClick={handleRefresh} 
+                                disabled={isRefreshing}
+                                className="w-100 mt-3"
+                            >
+                                {isRefreshing ? (
+                                    <>
+                                        <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
+                                        Actualizando...
+                                    </>
+                                ) : (
+                                    <><FaRedoAlt className="me-2" /> Actualizar Puntos</>
+                                )}
+                            </Button>
                         </Card.Body>
                     </Card>
                 </Col>
             </Row>
 
-            {/* SECCIÓN DE HISTORIAL DE TRANSACCIONES */}
-            <Row className="mt-4">
+            <hr/>
+            
+            {/* --- Sección de Últimas Transacciones --- */}
+            <Row className="mt-5">
                 <Col>
-                    <Card className="shadow-sm rounded-lg">
+                    <Card className="shadow-sm">
+                        <Card.Header as="h5" className="bg-primary text-white">
+                            <FaExchangeAlt className="me-2" /> Últimas 10 Transacciones
+                        </Card.Header>
                         <Card.Body>
-                            <Card.Title className="text-center mb-3">Historial de Transacciones</Card.Title>
                             {loadingTransactions ? (
-                                <div className="text-center py-3">
-                                    <Spinner animation="border" size="sm" />
-                                    <p className="mt-2 text-muted">Cargando historial...</p>
+                                <div className="text-center py-4">
+                                    <Spinner animation="border" />
+                                    <p className="mt-2">Cargando historial...</p>
                                 </div>
-                            ) : transactionsError ? (
-                                <Alert variant="danger" className="text-center">{transactionsError}</Alert>
-                            ) : transactions.length === 0 ? (
-                                <Alert variant="info" className="text-center">
-                                    Aún no tienes transacciones registradas. ¡Empieza a acumular puntos!
-                                </Alert>
+                            ) : transactionError ? (
+                                <Alert variant="danger" className="text-center">{transactionError}</Alert>
+                            ) : userTransactions.length === 0 ? (
+                                <Alert variant="info" className="text-center">Aún no hay transacciones registradas.</Alert>
                             ) : (
-                                <>
-                                    <p className="text-muted text-center">Mostrando las últimas 5 transacciones.</p>
-                                    <ListGroup variant="flush">
-                                        {transactions.slice(0, 5).map(transaction => ( // <== MOSTRANDO SOLO LAS ÚLTIMAS 5 EN EL DASHBOARD
-                                            <ListGroup.Item key={transaction.id} className="d-flex justify-content-between align-items-center">
-                                                <div>
-                                                    {transaction.tipo_transaccion === 'compra' ? (
-                                                        <>
-                                                            <span className="fw-bold text-success">Compra:</span> ${transaction.monto_compra}
-                                                            <span className="ms-3 text-success">+{transaction.puntos_cantidad} puntos</span>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <span className="fw-bold text-warning">Canje:</span> {transaction.nombre_producto_canjeado || 'Producto Desconocido'}
-                                                            <span className="ms-3 text-danger">{transaction.puntos_cantidad} puntos</span>
-                                                        </>
-                                                    )}
-                                                    <div className="text-muted small">
-                                                        {formatDateTime(transaction.fecha_transaccion)}
-                                                        {transaction.nombre_admin_realizo && ` (por ${transaction.nombre_admin_realizo})`}
-                                                    </div>
-                                                </div>
-                                            </ListGroup.Item>
+                                <Table striped bordered hover responsive size="sm">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Tipo</th>
+                                            <th>Monto/Producto</th>
+                                            <th>Puntos</th>
+                                            <th>Fecha</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {userTransactions.map((tx, index) => (
+                                            <tr key={tx.id}>
+                                                <td>{index + 1}</td>
+                                                <td>
+                                                    {tx.type === 'purchase' ? 
+                                                        <><FaShoppingCart className="text-success me-1" /> **Compra**</> : 
+                                                        <><FaGift className="text-danger me-1" /> **Canje**</>
+                                                    }
+                                                </td>
+                                                <td>
+                                                    {tx.type === 'purchase' ? 
+                                                        `$${parseFloat(tx.amount || 0).toFixed(2)}` : 
+                                                        tx.product_name || 'Producto Canjeado'
+                                                    }
+                                                </td>
+                                                <td>
+                                                    <span className={`fw-bold ${tx.points_change > 0 ? 'text-success' : 'text-danger'}`}>
+                                                        {tx.points_change > 0 ? `+${tx.points_change}` : tx.points_change}
+                                                    </span>
+                                                </td>
+                                                <td>{formatDate(tx.transaction_date)}</td>
+                                            </tr>
                                         ))}
-                                    </ListGroup>
-                                    <div className="text-center mt-3">
-                                        <Button variant="primary" onClick={handleShowModal}>
-                                            Ver Historial Completo
-                                        </Button>
-                                    </div>
-                                </>
+                                    </tbody>
+                                </Table>
                             )}
                         </Card.Body>
                     </Card>
                 </Col>
             </Row>
-
-            {/* <==== COMPONENTE DEL MODAL AGREGADO AQUÍ ====> */}
-            <Modal show={showModal} onHide={handleCloseModal} centered size="lg">
-                <Modal.Header closeButton>
-                    <Modal.Title>Historial Completo de Transacciones</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    {transactions.length === 0 ? (
-                        <Alert variant="info">No tienes transacciones para mostrar.</Alert>
-                    ) : (
-                        <ListGroup variant="flush">
-                            {transactions.map(transaction => (
-                                <ListGroup.Item key={transaction.id} className="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        {transaction.tipo_transaccion === 'compra' ? (
-                                            <>
-                                                <span className="fw-bold text-success">Compra:</span> ${transaction.monto_compra}
-                                                <span className="ms-3 text-success">+{transaction.puntos_cantidad} puntos</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <span className="fw-bold text-warning">Canje:</span> {transaction.nombre_producto_canjeado || 'Producto Desconocido'}
-                                                <span className="ms-3 text-danger">{transaction.puntos_cantidad} puntos</span>
-                                            </>
-                                        )}
-                                        <div className="text-muted small">
-                                            {formatDateTime(transaction.fecha_transaccion)}
-                                            {transaction.nombre_admin_realizo && ` (por ${transaction.nombre_admin_realizo})`}
-                                        </div>
-                                    </div>
-                                </ListGroup.Item>
-                            ))}
-                        </ListGroup>
-                    )}
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={handleCloseModal}>
-                        Cerrar
-                    </Button>
-                </Modal.Footer>
-            </Modal>
+            {/* --- Fin Sección Transacciones --- */}
         </Container>
     );
 };
