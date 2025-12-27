@@ -43,7 +43,7 @@ const UserManagementPage = () => {
         }
     }, [isAdmin, token, user]);
 
-    // --- CARGAR ÚLTIMAS 10 TRANSACCIONES ---
+    // --- CARGAR HISTORIAL DE TRANSACCIONES ---
     const fetchTransactions = useCallback(async (userId) => {
         if (!userId) return;
         setLoadingTransactions(true);
@@ -118,7 +118,7 @@ const UserManagementPage = () => {
     const renderTransactionsTable = () => {
         if (loadingTransactions) return <div className="text-center my-3"><Spinner animation="border" size="sm" /> Cargando historial...</div>;
         if (transactionError) return <Alert variant="warning" className="mt-2">{transactionError}</Alert>;
-        if (!recentTransactions || recentTransactions.length === 0) return <Alert variant="info" className="mt-2">No hay transacciones recientes.</Alert>;
+        if (!recentTransactions || recentTransactions.length === 0) return <Alert variant="info" className="mt-2">No hay transacciones registradas.</Alert>;
 
         return (
             <Table striped bordered hover size="sm" className="mt-2">
@@ -198,35 +198,45 @@ const UserManagementPage = () => {
             </Modal>
 
             {/* Modal Editar / Historial */}
-            <Modal show={showEditModal} onHide={handleCloseEditModal} size="lg">
+            <Modal show={showEditModal} onHide={handleCloseEditModal} size="xl">
                 <Modal.Header closeButton><Modal.Title>Usuario: {currentUserToEdit?.nombre}</Modal.Title></Modal.Header>
                 <Modal.Body>
-                    <div className="row">
-                        <div className="col-md-6">
-                            <h5>Información</h5>
-                            <ListGroup variant="flush">
-                                <ListGroup.Item><strong>Email:</strong> {currentUserToEdit?.email}</ListGroup.Item>
-                                <ListGroup.Item><strong>Puntos:</strong> {currentUserToEdit?.puntos_actuales}</ListGroup.Item>
-                            </ListGroup>
-                            
-                            <Form.Group className="mt-3">
-                                <Form.Label><strong>Rol:</strong></Form.Label>
-                                <Form.Select value={newRole} onChange={(e) => setNewRole(e.target.value)}>
-                                    <option value="user">Usuario</option>
-                                    <option value="employee">Empleado</option>
-                                    <option value="admin">Administrador</option>
-                                </Form.Select>
-                            </Form.Group>
+                    {/* AGREGADO: align-items-start para que funcione el sticky */}
+                    <div className="row align-items-start">
+                        <div className="col-md-4">
+                            {/* AGREGADO: Contenedor sticky para la información del usuario */}
+                            <div style={{ position: 'sticky', top: '0' }}>
+                                <div className="p-3 border rounded bg-light">
+                                    <h5 className="mb-3">Información del Usuario</h5>
+                                    <ListGroup variant="flush" className="mb-3">
+                                        <ListGroup.Item className="bg-transparent px-0"><strong>Email:</strong><br/> {currentUserToEdit?.email}</ListGroup.Item>
+                                        <ListGroup.Item className="bg-transparent px-0"><strong>Puntos Actuales:</strong><br/> <span className="fs-4 text-primary fw-bold">{currentUserToEdit?.puntos_actuales}</span></ListGroup.Item>
+                                    </ListGroup>
+                                    
+                                    <Form.Group className="mt-3">
+                                        <Form.Label><strong>Rol Asignado:</strong></Form.Label>
+                                        <Form.Select value={newRole} onChange={(e) => setNewRole(e.target.value)}>
+                                            <option value="user">Usuario</option>
+                                            <option value="employee">Empleado</option>
+                                            <option value="admin">Administrador</option>
+                                        </Form.Select>
+                                    </Form.Group>
+                                    
+                                    <div className="d-grid gap-2 mt-4">
+                                        <Button variant="primary" onClick={handleUpdateRole}>Guardar Rol</Button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div className="col-md-6">
-                            <h5>Últimas 10 Transacciones</h5>
+                        
+                        <div className="col-md-8">
+                            <h5 className="mb-3">Historial Completo de Transacciones</h5>
                             {renderTransactionsTable()}
                         </div>
                     </div>
                 </Modal.Body>
                 <Modal.Footer>
-                    <Button variant="secondary" onClick={handleCloseEditModal}>Cancelar</Button>
-                    <Button variant="primary" onClick={handleUpdateRole}>Guardar Cambios</Button>
+                    <Button variant="secondary" onClick={handleCloseEditModal}>Cerrar</Button>
                 </Modal.Footer>
             </Modal>
         </Container>

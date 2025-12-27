@@ -1,5 +1,3 @@
-
-
 // frontend/src/pages/DashboardPage.js
 import React, { useEffect, useState } from 'react';
 import { Container, Card, Row, Col, Spinner, Alert, ListGroup, Button, Modal } from 'react-bootstrap';
@@ -27,7 +25,7 @@ const DashboardPage = () => {
     // Estado para el valor del QR
     const [qrValue, setQrValue] = useState('');
 
-    // <==== ESTADOS Y FUNCIONES PARA EL MODAL AGREGADOS ====>
+    // ESTADOS Y FUNCIONES PARA EL MODAL
     const [showModal, setShowModal] = useState(false);
     const handleShowModal = () => setShowModal(true);
     const handleCloseModal = () => setShowModal(false);
@@ -81,7 +79,7 @@ const DashboardPage = () => {
         }
     }, [isAuthenticated, user, loadingAuth]);
 
-    // NUEVO EFECTO PARA OBTENER EL HISTORIAL DE TRANSACCIONES
+    // EFECTO PARA OBTENER EL HISTORIAL DE TRANSACCIONES
     useEffect(() => {
         const fetchTransactionsHistory = async () => {
             if (!isAuthenticated || !user || !user.id) {
@@ -91,6 +89,7 @@ const DashboardPage = () => {
             try {
                 setLoadingTransactions(true);
                 setTransactionsError(null);
+                // Asumimos que el backend devuelve la lista ordenada por fecha DESC
                 const response = await axios.get(`/transactions/history/${user.id}`);
                 setTransactions(response.data);
             } catch (err) {
@@ -107,6 +106,7 @@ const DashboardPage = () => {
     }, [isAuthenticated, user, loadingAuth]);
 
     const formatDateTime = (isoString) => {
+        if (!isoString) return '';
         const date = new Date(isoString);
         return date.toLocaleString('es-AR', { 
             year: 'numeric', 
@@ -134,6 +134,42 @@ const DashboardPage = () => {
             </Container>
         );
     }
+
+    // Helper para renderizar un item de transacción
+    const renderTransactionItem = (transaction) => (
+        <ListGroup.Item key={transaction.id || Math.random()} className="d-flex justify-content-between align-items-center">
+            <div className="w-100">
+                <div className="d-flex justify-content-between">
+                    <div>
+                        {transaction.tipo_transaccion === 'compra' ? (
+                            <>
+                                <span className="fw-bold text-success">Compra</span>
+                                <span className="mx-2 text-muted">|</span>
+                                <span>${transaction.monto_compra}</span>
+                            </>
+                        ) : (
+                            <>
+                                <span className="fw-bold text-warning">Canje</span>
+                                <span className="mx-2 text-muted">|</span>
+                                <span>{transaction.nombre_producto_canjeado || 'Producto'}</span>
+                            </>
+                        )}
+                    </div>
+                    <div>
+                        {transaction.tipo_transaccion === 'compra' ? (
+                            <span className="badge bg-success">+{transaction.puntos_cantidad} pts</span>
+                        ) : (
+                            <span className="badge bg-danger">{transaction.puntos_cantidad} pts</span>
+                        )}
+                    </div>
+                </div>
+                <div className="text-muted small mt-1">
+                    {formatDateTime(transaction.fecha_transaccion)}
+                    {transaction.nombre_admin_realizo && ` (Atendido por: ${transaction.nombre_admin_realizo})`}
+                </div>
+            </div>
+        </ListGroup.Item>
+    );
 
     return (
         <Container className="my-5 p-4 border rounded shadow-sm" style={{ maxWidth: '800px' }}>
@@ -174,40 +210,23 @@ const DashboardPage = () => {
                                     <Card.Title className="mb-3">Código de Canje</Card.Title>
                                     <div className="d-flex justify-content-center mb-3">
                                         {qrValue ? (
-                                            <QRCodeCanvas 
-                                                value={qrValue} 
-                                                size={180} 
-                                                level="H" 
-                                                includeMargin={true} 
-                                            />
-                                        ) : (
-                                            <Spinner animation="border" />
-                                        )}
+                                            <QRCodeCanvas value={qrValue} size={180} level="H" includeMargin={true} />
+                                        ) : <Spinner animation="border" />}
                                     </div>
-                                    <p className="fw-bold mt-2">Muestra este QR al vendedor para canjear tu producto.</p>
-                                    <Card.Text className="text-muted">
-                                        Este código es único y válido solo para esta transacción.
-                                    </Card.Text>
+                                    <p className="fw-bold mt-2">Muestra este QR para canjear.</p>
                                 </>
                             ) : (
                                 <>
-                                    <Card.Title className="mb-3">Tu Código QR de Usuario</Card.Title>
+                                    <Card.Title className="mb-3">Tu Código QR</Card.Title>
                                     <div className="d-flex justify-content-center mb-3">
                                         {qrValue ? (
-                                            <QRCodeCanvas 
-                                                value={qrValue} 
-                                                size={180} 
-                                                level="H" 
-                                                includeMargin={true} 
-                                            />
-                                        ) : (
-                                            <Spinner animation="border" />
-                                        )}
+                                            <QRCodeCanvas value={qrValue} size={180} level="H" includeMargin={true} />
+                                        ) : <Spinner animation="border" />}
                                     </div>
-                                    <Card.Text className="text-muted">
-                                        Muestra este QR al vendedor para registrar tus compras y canjes.
+                                    <p className="fw-bold mt-2">ID: {user?.id}</p>
+                                    <Card.Text className="text-muted small">
+                                        Para sumar puntos o canjear premios.
                                     </Card.Text>
-                                    <p className="fw-bold mt-2">ID de Usuario: {user?.id}</p>
                                 </>
                             )}
                         </Card.Body>
@@ -220,49 +239,31 @@ const DashboardPage = () => {
                 <Col>
                     <Card className="shadow-sm rounded-lg">
                         <Card.Body>
-                            <Card.Title className="text-center mb-3">Historial de Transacciones</Card.Title>
+                            <Card.Title className="text-center mb-3">Últimas Transacciones</Card.Title>
                             {loadingTransactions ? (
                                 <div className="text-center py-3">
                                     <Spinner animation="border" size="sm" />
-                                    <p className="mt-2 text-muted">Cargando historial...</p>
                                 </div>
                             ) : transactionsError ? (
                                 <Alert variant="danger" className="text-center">{transactionsError}</Alert>
                             ) : transactions.length === 0 ? (
                                 <Alert variant="info" className="text-center">
-                                    Aún no tienes transacciones registradas. ¡Empieza a acumular puntos!
+                                    Aún no tienes movimientos registrados.
                                 </Alert>
                             ) : (
                                 <>
-                                    <p className="text-muted text-center">Mostrando las últimas 5 transacciones.</p>
                                     <ListGroup variant="flush">
-                                        {transactions.slice(0, 5).map(transaction => ( // <== MOSTRANDO SOLO LAS ÚLTIMAS 5 EN EL DASHBOARD
-                                            <ListGroup.Item key={transaction.id} className="d-flex justify-content-between align-items-center">
-                                                <div>
-                                                    {transaction.tipo_transaccion === 'compra' ? (
-                                                        <>
-                                                            <span className="fw-bold text-success">Compra:</span> ${transaction.monto_compra}
-                                                            <span className="ms-3 text-success">+{transaction.puntos_cantidad} puntos</span>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <span className="fw-bold text-warning">Canje:</span> {transaction.nombre_producto_canjeado || 'Producto Desconocido'}
-                                                            <span className="ms-3 text-danger">{transaction.puntos_cantidad} puntos</span>
-                                                        </>
-                                                    )}
-                                                    <div className="text-muted small">
-                                                        {formatDateTime(transaction.fecha_transaccion)}
-                                                        {transaction.nombre_admin_realizo && ` (por ${transaction.nombre_admin_realizo})`}
-                                                    </div>
-                                                </div>
-                                            </ListGroup.Item>
-                                        ))}
+                                        {/* AQUÍ SE MUESTRAN SOLO LAS ÚLTIMAS 5 */}
+                                        {transactions.slice(0, 5).map(transaction => renderTransactionItem(transaction))}
                                     </ListGroup>
-                                    <div className="text-center mt-3">
-                                        <Button variant="primary" onClick={handleShowModal}>
-                                            Ver Historial Completo
-                                        </Button>
-                                    </div>
+                                    
+                                    {transactions.length > 5 && (
+                                        <div className="text-center mt-3">
+                                            <Button variant="outline-primary" size="sm" onClick={handleShowModal}>
+                                                Ver Historial Completo
+                                            </Button>
+                                        </div>
+                                    )}
                                 </>
                             )}
                         </Card.Body>
@@ -270,37 +271,17 @@ const DashboardPage = () => {
                 </Col>
             </Row>
 
-            {/* <==== COMPONENTE DEL MODAL AGREGADO AQUÍ ====> */}
-            <Modal show={showModal} onHide={handleCloseModal} centered size="lg">
+            {/* MODAL HISTORIAL COMPLETO */}
+            <Modal show={showModal} onHide={handleCloseModal} centered size="lg" scrollable>
                 <Modal.Header closeButton>
-                    <Modal.Title>Historial Completo de Transacciones</Modal.Title>
+                    <Modal.Title>Historial Completo</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
                     {transactions.length === 0 ? (
-                        <Alert variant="info">No tienes transacciones para mostrar.</Alert>
+                        <Alert variant="info">No hay datos.</Alert>
                     ) : (
                         <ListGroup variant="flush">
-                            {transactions.map(transaction => (
-                                <ListGroup.Item key={transaction.id} className="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        {transaction.tipo_transaccion === 'compra' ? (
-                                            <>
-                                                <span className="fw-bold text-success">Compra:</span> ${transaction.monto_compra}
-                                                <span className="ms-3 text-success">+{transaction.puntos_cantidad} puntos</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <span className="fw-bold text-warning">Canje:</span> {transaction.nombre_producto_canjeado || 'Producto Desconocido'}
-                                                <span className="ms-3 text-danger">{transaction.puntos_cantidad} puntos</span>
-                                            </>
-                                        )}
-                                        <div className="text-muted small">
-                                            {formatDateTime(transaction.fecha_transaccion)}
-                                            {transaction.nombre_admin_realizo && ` (por ${transaction.nombre_admin_realizo})`}
-                                        </div>
-                                    </div>
-                                </ListGroup.Item>
-                            ))}
+                            {transactions.map(transaction => renderTransactionItem(transaction))}
                         </ListGroup>
                     )}
                 </Modal.Body>
