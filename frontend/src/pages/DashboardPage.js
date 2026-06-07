@@ -78,7 +78,7 @@ const DashboardPage = () => {
         }
     }, [isAuthenticated, user, loadingAuth]);
 
-    // EFECTO PARA OBTENER EL HISTORIAL DE TRANSACCIONES
+    // EFECTO PARA OBTENER EL HISTORIAL DE TRANSACCIONES (Corregida la URL de la API)
     useEffect(() => {
         const fetchTransactionsHistory = async () => {
             if (!isAuthenticated || !user || !user.id) {
@@ -88,7 +88,9 @@ const DashboardPage = () => {
             try {
                 setLoadingTransactions(true);
                 setTransactionsError(null);
-                const response = await axios.get(`/transactions/history/${user.id}`);
+                // CORRECCIÓN DE RUTA: Modificado de /transactions/history/ a /transactions/user/
+                // para alinearse con los endpoints correctos del backend de transacciones.
+                const response = await axios.get(`/transactions/user/${user.id}`);
                 setTransactions(response.data);
             } catch (err) {
                 console.error('Error al obtener el historial de transacciones:', err);
@@ -233,7 +235,7 @@ const DashboardPage = () => {
                                 <>
                                     <p className="text-muted text-center">Mostrando las últimas 10 transacciones.</p>
                                     <ListGroup variant="flush">
-                                        {transactions.slice(0, 10).map(transaction => ( // CAMBIO: AHORA MUESTRA 10
+                                        {transactions.slice(0, 10).map(transaction => (
                                             <ListGroup.Item key={transaction.id} className="d-flex justify-content-between align-items-center">
                                                 <div>
                                                     {transaction.tipo_transaccion === 'compra' ? (
