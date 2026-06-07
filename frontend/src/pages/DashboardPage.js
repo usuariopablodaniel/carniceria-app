@@ -78,7 +78,7 @@ const DashboardPage = () => {
         }
     }, [isAuthenticated, user, loadingAuth]);
 
-    // EFECTO PARA OBTENER EL HISTORIAL DE TRANSACCIONES (Corregida la URL de la API)
+    // EFECTO PARA OBTENER EL HISTORIAL DE TRANSACCIONES
     useEffect(() => {
         const fetchTransactionsHistory = async () => {
             if (!isAuthenticated || !user || !user.id) {
@@ -88,8 +88,7 @@ const DashboardPage = () => {
             try {
                 setLoadingTransactions(true);
                 setTransactionsError(null);
-                // CORRECCIÓN DE RUTA: Modificado de /transactions/history/ a /transactions/user/
-                // para alinearse con los endpoints correctos del backend de transacciones.
+                // Consulta al endpoint correcto del historial de transacciones del usuario
                 const response = await axios.get(`/transactions/user/${user.id}`);
                 setTransactions(response.data);
             } catch (err) {
@@ -236,22 +235,24 @@ const DashboardPage = () => {
                                     <p className="text-muted text-center">Mostrando las últimas 10 transacciones.</p>
                                     <ListGroup variant="flush">
                                         {transactions.slice(0, 10).map(transaction => (
-                                            <ListGroup.Item key={transaction.id} className="d-flex justify-content-between align-items-center">
+                                            <ListGroup.Item key={transaction.id || transaction.transaction_date} className="d-flex justify-content-between align-items-center">
                                                 <div>
-                                                    {transaction.tipo_transaccion === 'compra' ? (
+                                                    {transaction.transaction_type === 'compra' ? (
                                                         <>
                                                             <span className="fw-bold text-success">Compra:</span> ${transaction.monto_compra}
                                                             <span className="ms-3 text-success">+{transaction.puntos_cantidad} puntos</span>
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <span className="fw-bold text-warning">Canje:</span> {transaction.nombre_producto_canjeado || 'Producto Desconocido'}
+                                                            <span className="fw-bold text-warning">Canje:</span> {transaction.producto_canjeado || 'Producto Desconocido'}
                                                             <span className="ms-3 text-danger">{transaction.puntos_cantidad} puntos</span>
                                                         </>
                                                     )}
-                                                    <div className="text-muted small">
-                                                        {formatDateTime(transaction.fecha_transaccion)}
-                                                        {transaction.nombre_admin_realizo && ` (por ${transaction.nombre_admin_realizo})`}
+                                                    <div className="text-muted small mt-1">
+                                                        {formatDateTime(transaction.transaction_date)}
+                                                    </div>
+                                                    <div className="text-muted small fw-semibold" style={{ fontSize: '0.85em' }}>
+                                                        Procesado por: {transaction.scanner_user || 'Sistema/Vendedor'}
                                                     </div>
                                                 </div>
                                             </ListGroup.Item>
@@ -280,22 +281,24 @@ const DashboardPage = () => {
                     ) : (
                         <ListGroup variant="flush">
                             {transactions.map(transaction => (
-                                <ListGroup.Item key={transaction.id} className="d-flex justify-content-between align-items-center">
+                                <ListGroup.Item key={transaction.id || transaction.transaction_date} className="d-flex justify-content-between align-items-center">
                                     <div>
-                                        {transaction.tipo_transaccion === 'compra' ? (
+                                        {transaction.transaction_type === 'compra' ? (
                                             <>
                                                 <span className="fw-bold text-success">Compra:</span> ${transaction.monto_compra}
                                                 <span className="ms-3 text-success">+{transaction.puntos_cantidad} puntos</span>
                                             </>
                                         ) : (
                                             <>
-                                                <span className="fw-bold text-warning">Canje:</span> {transaction.nombre_producto_canjeado || 'Producto Desconocido'}
+                                                <span className="fw-bold text-warning">Canje:</span> {transaction.producto_canjeado || 'Producto Desconocido'}
                                                 <span className="ms-3 text-danger">{transaction.puntos_cantidad} puntos</span>
                                             </>
                                         )}
-                                        <div className="text-muted small">
-                                            {formatDateTime(transaction.fecha_transaccion)}
-                                            {transaction.nombre_admin_realizo && ` (por ${transaction.nombre_admin_realizo})`}
+                                        <div className="text-muted small mt-1">
+                                            {formatDateTime(transaction.transaction_date)}
+                                        </div>
+                                        <div className="text-muted small fw-semibold" style={{ fontSize: '0.85em' }}>
+                                            Procesado por: {transaction.scanner_user || 'Sistema/Vendedor'}
                                         </div>
                                     </div>
                                 </ListGroup.Item>
